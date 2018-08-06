@@ -58,30 +58,7 @@ def select_adjacent_faces(points, faces):
     
     return selections
     
-def adjacency2edges(adjacency):
-    edges = [frozenset(itertools.product([i], vertices)) for i,vertices in enumerate(adjacency)]
-    edges = set(_flatten(edges))
-    return edges
 
-def edges2adjacency(edges, num_nodes):
-    adjacency = [set() for i in range(num_nodes)]
-    for edge in edges:
-        adjacency[edge[0]].add(edge[1])
-        adjacency[edge[1]].add(edge[0])
-    return adjacency            
-
-def adjacency2matrix(adjacency):
-    m = np.zeros((len(adjacency),)*2,dtype=bool)
-    for i,adjacent in enumerate(adjacency):
-        for j in adjacent:
-            m[i,j] = True
-            m[j,i] = True
-    return m
-    
-def subgraph(adjacency, indices):
-    indices = list(indices)
-    return [set(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
-    
 def _ccw(a, b, c):
     return np.cross(b-a, c-a) <= 0
     #return (c[1]-a[1]) * (b[0]-a[0]) > (b[1]-a[1]) * (c[0]-a[0])
@@ -94,8 +71,9 @@ def gabriel(points):
                 (_ccw(a[0],a[1],b[0]) != _ccw(a[0],a[1],b[1])))
 
     simplices = Delaunay(points).simplices
-    
-    edges = _simplex_edges(simplices)
+
+    edges = np.array([list(edge) for edge in _simplex_edges(simplices)])
+
     vor = Voronoi(points)
     
     to_keep = np.zeros(len(edges), dtype=bool)
@@ -111,17 +89,14 @@ def gabriel(points):
     return edges2adjacency(edges[to_keep], len(points))
 
 def _simplex_edges(simplices):
-    edges = set([(simplex[i-1],simplex[i]) for i in range(3)] for simplex in simplices)
-    #edges = np.array(list(itertools.chain.from_iterable(edges)))
-    
-    return #np.unique(np.sort(edges,axis=1),axis=0)    
+    edges = [[frozenset((simplex[i - 1], simplex[i])) for i in range(3)] for simplex in simplices]
+    return set(itertools.chain.from_iterable(edges))
     
 def urquhart(points, progress_bar=False):
     """Return the Urquhart Graph as an adjacency list."""
 
     simplices = Delaunay(points).simplices
-    edges = [[frozenset((simplex[i-1],simplex[i])) for i in range(3)] for simplex in simplices]
-    edges = set(itertools.chain.from_iterable(edges))
+    edges = _simplex_edges(simplices)
     lengths = {edge : np.linalg.norm(np.diff([points[i] for i in edge],axis=0),axis=1)[0] for edge in edges}
     
     to_remove=set()
@@ -140,10 +115,6 @@ def urquhart(points, progress_bar=False):
 def find_clockwise(points, adjacency):
     """Create a dict mapping a directed edge to the next edge 
     adjacent its tail going in the clockwise direction.
-    
-    todo:
-     - Faster method without calculating angles?
-    
     """
     
     clockwise = {}

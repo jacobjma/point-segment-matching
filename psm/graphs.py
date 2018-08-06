@@ -1,10 +1,10 @@
-import numpy as np
-from scipy.spatial import Delaunay, Voronoi
-from collections import defaultdict
 import itertools
-from tqdm import tqdm_notebook as tqdm
-from ssm.simplex_merging import simplex_merging
+
+import numpy as np
 from scipy.sparse.csgraph import connected_components
+from scipy.spatial import Delaunay, Voronoi
+from tqdm import tqdm_notebook as tqdm
+
 
 def _flatten(lists):
     return [item for sublist in lists for item in sublist]
@@ -79,13 +79,6 @@ def adjacency2matrix(adjacency):
     return m
     
 def subgraph(adjacency, indices):
-    """
-    
-    
-    todo:
-    - improve speed
-    
-    """
     indices = list(indices)
     return [set(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
     
@@ -270,7 +263,6 @@ def all_traversals(points, adjacency, second_point='random', max_points=None,
         permutation = range(0, max_points)
     
     clockwise = find_clockwise(points, adjacency)
-    import time
     traversals = []
     for i,point in enumerate(tqdm(points, unit=' traversals', miniters=1, mininterval=.01, disable = not progress_bar)):
         for j in adjacency[i]:

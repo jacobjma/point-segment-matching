@@ -1,16 +1,18 @@
-import itertools
 import heapq
-from tqdm import tqdm_notebook as tqdm
+import itertools
+
 import numpy as np
 import scipy
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse.csgraph import connected_components
-from ssm.rmsd import rmsd_qcp, rmsd_kabsch, safe_rmsd
-from ssm.symmetry import point_symmetries
-from ssm.graphs import find_clockwise, check_isomorphism
-from ssm.subgraph_isomorphism import subgraph_isomorphisms
-from ssm.structures import Structures
 from sklearn.cluster import DBSCAN
+from tqdm import tqdm_notebook as tqdm
+
+from psm.graphs import find_clockwise, check_isomorphism
+from psm.rmsd import safe_rmsd
+from psm.structures import Structures
+from psm.subgraph_isomorphism import subgraph_isomorphisms
+
 
 def _affine_transform(src, dst):
     
@@ -196,7 +198,7 @@ class RMSD(object):
     
         p, q = self._get_points(a, b, precalced)
         
-        rmsd = rmsd_qcp(p, q)
+        rmsd = safe_rmsd(p, q)
         
         return rmsd, None
     
@@ -526,7 +528,7 @@ class BNB(RMSD):
         lower_bound, permutation = node.eval_bound(angles, diagonal, 
                                     off_diagonal, assignment='hungarian')
         
-        rmsd = rmsd_qcp(q, p[permutation])
+        rmsd = safe_rmsd(q, p[permutation])
         
         return rmsd #, permutation
         

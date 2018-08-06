@@ -1,16 +1,16 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap, BoundaryNorm
-from matplotlib.axes import SubplotBase
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
 import matplotlib.colors as mcolors
-from ssm.graphs import adjacency2edges
-from ssm.structures import Structures
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.axes import SubplotBase
+from matplotlib.collections import PatchCollection
+from matplotlib.patches import Polygon
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from psm.graphs import adjacency2edges
+
 
 def add_colorbar(mapable, ax, position='right', size='5%', pad=0.05, **kwargs):
-    
+
     if position in ['right', 'left']:
         orientation = 'vertical'
     elif position in ['top', 'bottom']:

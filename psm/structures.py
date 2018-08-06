@@ -1,7 +1,10 @@
-import numpy as np
 import numbers
-from ssm import graphs
 from copy import deepcopy
+
+import numpy as np
+
+from psm import graphs
+
 
 def segment_centers(points, segments):
     return np.array([np.mean(points[segment],axis=0) for segment in segments])

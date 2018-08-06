@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import optimize
-from scipy.stats import trim_mean
+
 
 class PeakModel(object):
     

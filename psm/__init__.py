@@ -1,1 +1,1 @@
-from ssm.structures import Structures
+from psm.structures import Structures

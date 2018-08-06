@@ -1,5 +1,4 @@
 import numpy as np
-#from ssm.qcp import rmsd_qcp
 
 def rmsd_kabsch(src, dst):
     

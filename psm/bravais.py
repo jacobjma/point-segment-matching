@@ -1,13 +1,14 @@
-import numpy as np
-from ssm.graphs import select_segments
-from scipy.optimize import least_squares
-from ssm import graphs, peaks
-from ssm.structures import segment_centers
-from ssm import Structures
-from scipy.ndimage import gaussian_laplace
-from ssm.fitting import Polynomial2D
 from copy import copy
+
+import numpy as np
+from scipy.ndimage import gaussian_laplace
+from scipy.optimize import least_squares
 from tqdm import tqdm_notebook as tqdm
+
+from psm import Structures
+from psm import graphs, peaks
+from psm.fitting import Polynomial2D
+from psm.structures import segment_centers
 
 '''
 todo: 

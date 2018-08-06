@@ -1,5 +1,7 @@
-import numpy as np
 import numbers
+
+import numpy as np
+
 
 def rotate_points(points, angle, center='cop'):
     """Rotate point positions.

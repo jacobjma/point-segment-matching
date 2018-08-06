@@ -1,14 +1,14 @@
-import numpy as np
 from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.ndimage.measurements import center_of_mass, label
 from tqdm import tqdm_notebook as tqdm
-from ssm.fitting import *
-from scipy.ndimage import gaussian_laplace
 
-def find_local_peaks(image, min_distance, threshold=0, local_threshold=0, 
+from psm.fitting import *
+
+
+def find_local_peaks(image, min_distance, threshold=0, local_threshold=0,
                     exclude_border=0, exclude_adjacent=False):
     
-    """Return peaks in an image as a Points object.
+    """Return peaks in an image.
     
     Peaks are the local maxima in a region of `2 * min_distance + 1`
     (i.e. peaks are separated by at least `min_distance`).
@@ -139,5 +139,3 @@ def refine_peaks(image, points, model, extent=3, region_shape='disk', progress_b
         refined[i,:] = [x0+p[0],y0+p[1]]
     
     return refined
-
-

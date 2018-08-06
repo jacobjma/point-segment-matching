@@ -1,8 +1,10 @@
+from collections import defaultdict
+
 import numpy as np
 import scipy.spatial
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import NearestNeighbors
-from collections import defaultdict
+
 
 def _calc_circumcentre(p1, p2, p3):
 

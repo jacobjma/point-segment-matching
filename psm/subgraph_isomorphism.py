@@ -1,6 +1,9 @@
-import numpy as np
 from itertools import combinations
-from ssm.graphs import adjacency2matrix
+
+import numpy as np
+
+from psm.graphs import adjacency2matrix
+
 
 class Probe(object):
     

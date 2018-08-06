@@ -1,7 +1,7 @@
 import numpy as np
-from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage import median_filter
-#from ssm.bragg import BraggFilter
+from scipy.ndimage.filters import gaussian_filter
+
 
 def normalize_range(image, vmin=0, vmax=1):
     
@@ -34,7 +34,7 @@ def remove_hot_pixels(image, threshold=.5, filter_size=3):
     
 def remove_dead_pixels(image, threshold=.5, filter_size=3):
     
-    filtered = median_filter(image, size=6)
+    filtered = median_filter(image, size=filter_size)
     
     dead = normalize_range(filtered - image) > threshold
     

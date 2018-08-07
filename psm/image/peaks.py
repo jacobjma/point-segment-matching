@@ -2,7 +2,7 @@ from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.ndimage.measurements import center_of_mass, label
 from tqdm import tqdm_notebook as tqdm
 
-from psm.fitting import *
+from psm.image.fitting import *
 
 
 def find_local_peaks(image, min_distance, threshold=0, local_threshold=0,

@@ -4,7 +4,7 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 
 from psm.graph.graphutils import adjacency2matrix, adjacency2edges, find_clockwise
-from psm.utils import labels2indices
+from psm.utils import labels2groups
 
 
 def face_adjacency(faces):
@@ -32,7 +32,7 @@ def connected_faces(faces):
 
     connected = connected_components(adjacency2matrix(adjacency))[1]
 
-    return labels2indices(connected, sort_by_counts=True)
+    return labels2groups(connected, sort_by_counts=True)
 
 
 def find_outer_face(points, adjacency, faces):
@@ -45,7 +45,7 @@ def find_outer_face(points, adjacency, faces):
     pair = str(list(adjacency[leftmost])[np.argmin(slopes)]) + '|' + str(leftmost)
 
     for i, face in enumerate(faces):
-        if pair in '|'.join(map(str, face)):
+        if pair in '|'.join(map(str, face+[face[0]])):
             return i
 
     raise RuntimeError('Outer face not found.')

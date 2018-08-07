@@ -5,7 +5,7 @@ import numpy as np
 
 from psm.graph.geometric import urquhart
 from psm.graph.graphutils import find_clockwise, subgraph
-from psm.graph.traversal import clockwise_traversal_with_depth
+from psm.graph.traversal import clockwise_traversal_with_depth, clockwise_traversal_with_depth_and_skips
 from psm.register import MatchGraph
 from psm.structures import Structures
 from psm.utils import flatten
@@ -41,7 +41,8 @@ def build_lattice_dict(max_index, basis_size):
     return indices
 
 
-def lattice_traversal(a, b, basis=None, radius=None, skip=None, max_depth=None, graph_func=None, rmsd_calc=None, tol=1e-6):
+def lattice_traversal(a, b, basis=None, radius=None, skips=None, max_depth=None, graph_func=None, rmsd_calc=None,
+                      tol=1e-6):
     if graph_func is None:
         graph_func = urquhart
 
@@ -65,16 +66,16 @@ def lattice_traversal(a, b, basis=None, radius=None, skip=None, max_depth=None, 
     traversals = []
     for i in adjacency[root]:
         edge = (root, i)
-        traversal,_ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
+
+        if skips is None:
+            traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
+        else:
+            traversal, _ = clockwise_traversal_with_depth_and_skips(edge, adjacency, clockwise, max_depth, skips)
 
         if radius is not None:
             order = {j: i for i, j in enumerate(traversal)}
             keep = np.where(np.linalg.norm(points[traversal], axis=1) <= radius)[0]
             traversal = [traversal[i] for i in sorted(keep, key=order.get)]
-        elif skip is not None:
-            traversal = [i for i in traversal if not traversal.index(i) in skip]
-        #else:
-        #    raise ValueError()
 
         traversals.append(traversal)
 

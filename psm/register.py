@@ -104,16 +104,12 @@ class RMSD(object):
         return self._permutations
 
     def _get_other(self, structures):
-
         if structures == self._A:
             return self._B
         elif structures == self._B:
             return self._A
         else:
             raise RuntimeError
-
-    def min_rmsd(self, structures):
-        return np.nanmin(self.rmsd, axis=int(not self._get_axis(structures)))
 
     def _get_axis(self, structures):
 

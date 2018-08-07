@@ -79,7 +79,6 @@ def traverse_from_all(points, adjacency, second_point='random', max_depth=None, 
 
             edge = (i, j)
             traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth=max_depth)
-            traversals.append(traversal)
 
             if permute is not None:
                 traversals.append([traversal[k] for k in permute if k < len(traversal)])
@@ -87,6 +86,7 @@ def traverse_from_all(points, adjacency, second_point='random', max_depth=None, 
                 traversals.append(traversal)
 
             if second_point == 'random':
+                sss
                 break
 
     return traversals

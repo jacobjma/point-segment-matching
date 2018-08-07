@@ -1,3 +1,5 @@
+import itertools
+
 import numpy as np
 
 from psm.utils import flatten

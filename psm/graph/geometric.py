@@ -3,10 +3,11 @@ from collections import defaultdict
 
 import numpy as np
 import scipy.spatial
-import sklearn.cluster
-import sklearn.neighbors
+from sklearn.cluster import DBSCAN
+from sklearn.neighbors import NearestNeighbors
 
 from psm.graph.graphutils import edges2adjacency
+from psm.utils import flatten
 
 
 def _ccw(a, b, c):
@@ -41,7 +42,7 @@ def gabriel(points):
 
 def _simplex_edges(simplices):
     edges = [[frozenset((simplex[i - 1], simplex[i])) for i in range(3)] for simplex in simplices]
-    return set(itertools.chain.from_iterable(edges))
+    return set(flatten(edges))
 
 
 def urquhart(points):
@@ -83,18 +84,13 @@ def _calc_circumcenter(p1, p2, p3):
     return np.array([x0, y0])
 
 
-def _simplex_edges(simplices):
-    edges = []
-    for s in simplices:
-        for i in range(len(s)):
-            a = s[i]
-            b = s[(i + 1) % 3]
-            edges += [(a, b)]
-    return np.array(edges)
+def _directed_simplex_edges(simplices):
+    edges = [[(simplex[i - 1], simplex[i]) for i in range(3)] for simplex in simplices]
+    return flatten(edges)
 
 
 def _order_exterior_vertices(simplices):
-    edges = _simplex_edges(simplices).tolist()
+    edges = _directed_simplex_edges(simplices)
 
     tally = defaultdict(list)
     for i, item in enumerate(edges):
@@ -115,11 +111,11 @@ def circumcenter_clustering(points, k=.5, min_points=2, return_faces=False):
 
     vertices = np.array([_calc_circumcenter(*points[s]) for s in simplices])
 
-    nbrs = sklearn.cluster.NearestNeighbors(n_neighbors=2).fit(points)
+    nbrs = NearestNeighbors(n_neighbors=2).fit(points)
     distances, indices = nbrs.kneighbors(points)
 
     eps = k * np.median(distances[:, 1])
-    estimator = sklearn.neighbors.DBSCAN(eps=eps, min_samples=min_points)
+    estimator = DBSCAN(eps=eps, min_samples=min_points)
 
     labels = estimator.fit_predict(vertices)
 
@@ -129,7 +125,7 @@ def circumcenter_clustering(points, k=.5, min_points=2, return_faces=False):
         order = _order_exterior_vertices(simplices[v])
         faces += [order]
 
-    adjacency = [set() for i in range(len(points))]
+    adjacency = [set() for _ in range(len(points))]
     for face in faces:
         for i, j in enumerate(face):
             adjacency[j].add(face[i - 1])

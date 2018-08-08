@@ -2,6 +2,7 @@
 Point segment matching is a method for finding structure point clouds with repeating structures. The main application is for finding strain in atomic resolution images. A paper describing the technique is forthcoming.
 
 In the image below the method is applied to a set of points representing polycrystalline graphene. The analysis clearly shows compressive strain along the grain boundaries and highlights the rotations of the grains.
+
 ![abstract](/notebooks/abstract.png?raw=true "Polycrystaline graphene")
 
 To see how the above analysis was done see [example](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/poly_graphene_traversal.ipynb). You can also check out the [tutorial](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/tutorial_nanowire.ipynb).

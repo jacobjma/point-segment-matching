@@ -1,5 +1,6 @@
-# point-segment-matching
-Structural similarities and strain in atomic resolution images
+# Point Segment Matching
+Point segment matching is a method for finding structural similarities in sets of points point with repeating structures. The main application is within atomic resolution imaging. 
+
 
 ![abstract](/notebooks/abstract.png?raw=true "Polycrystaline graphene")
 

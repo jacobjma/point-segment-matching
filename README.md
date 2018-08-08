@@ -14,6 +14,6 @@ Structural similarities and strain in atomic resolution images
 ## Installation
 Install manually after cloning the repository from Github:
 
-    git clone https://github.com/jacobjma/structural-template-matching.git
-    cd structural-template-matching
+    git clone https://github.com/jacobjma/point-segment-matching.git
+    cd point-segment-matching
     python setup.py install

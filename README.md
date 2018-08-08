@@ -1,6 +1,8 @@
 # point-segment-matching
 Structural similarities and strain in atomic resolution images
 
+![abstract](/notebooks/abstract.png?raw=true "Polycrystaline graphene")
+
 ## Dependencies
 * [NumPy](http://docs.scipy.org/doc/numpy/reference/)
 * [matplotlib](http://matplotlib.org/)
@@ -15,4 +17,4 @@ Install manually after cloning the repository from Github:
 
     git clone https://github.com/jacobjma/point-segment-matching.git
     cd point-segment-matching
-    python setup.py install
+    pip install .

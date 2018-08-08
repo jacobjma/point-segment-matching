@@ -1,24 +1,24 @@
-from setuptools import setup, find_packages
-from distutils.extension import Extension
-from Cython.Build import cythonize
 import numpy as np
+from Cython.Build import cythonize
+from setuptools import setup, Extension, find_packages
 
-
-ext_modules=[
+ext_modules = [
     Extension(
-        'ssm.qcp',
-        sources=['ssm/qcp.pyx'],
+        'psm.geometry.qcp',
+        sources=['psm/geometry/qcp.pyx'],
         include_dirs=[np.get_include()]
-        )
-    ]
-    
+    )
+]
+
+print(find_packages())
+
 setup(
-    name='ssm',
+    name='psm',
     version='1.0',
-    description='Structural Segment Matching',
+    description='point-segment-matching',
     author='Jacob Madsen',
     author_email='jacob.jma@gmail.com',
-    packages=['ssm'], #same as name
-    install_requires=[], #external packages as dependencies
+    packages=find_packages(),  # same as name
+    install_requires=[],  # external packages as dependencies
     ext_modules=cythonize(ext_modules),
 )

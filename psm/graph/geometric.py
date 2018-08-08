@@ -11,7 +11,7 @@ from psm.utils import flatten
 
 
 def _ccw(a, b, c):
-    return np.cross(b - a, c - a) <= 0
+    return np.cross(b - a, c -a) <= 0
 
 
 def gabriel(points):

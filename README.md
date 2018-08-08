@@ -5,7 +5,7 @@ In the image below the method is applied to a set of points representing polycry
 
 ![abstract](/notebooks/abstract.png?raw=true "Polycrystaline graphene")
 
-To see how the above analysis was done see [example](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/poly_graphene_traversal.ipynb) or check out the [tutorial](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/tutorial_nanowire.ipynb) for more information.
+See [example](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/poly_graphene_traversal.ipynb) for how the above analysis was done or check out the [tutorial](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/tutorial_nanowire.ipynb) for more information.
 
 ## Installation
 Install manually after cloning the repository from Github:

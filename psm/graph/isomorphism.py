@@ -8,7 +8,7 @@ from psm.graph.traversal import clockwise_traversal
 
 
 def check_isomorphism(adjacency, clockwise, other_adjacency):
-    """ Returns True if two plane graphs rooted graphs are isomorphs else False."""
+    """Returns True if two plane graphs rooted graphs are isomorphs else False"""
 
     for i in adjacency[0]:
         edge = (0, i)
@@ -106,6 +106,7 @@ def _check_probe(probe, adjacency, subgraph_adjacency):
 
 
 def subgraph_isomorphisms(adjacency, clockwise, subgraph_adjacency):
+    # TODO: Docstring
     # TODO: Can this be sped up?
     subgraph_order = len(subgraph_adjacency)
     adjacency_matrix = adjacency2matrix(adjacency)

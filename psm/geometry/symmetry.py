@@ -32,7 +32,7 @@ def _angular_symmetries(angles, tol=1e-12):
 
 
 def point_symmetries(points, tol=1e-12):
-    """Return """
+    """Return the symmetry order of a set of points"""
     norms = np.linalg.norm(points, axis=1)
     points = points[norms > tol]
     norms = norms[norms > tol]

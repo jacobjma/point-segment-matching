@@ -64,6 +64,7 @@ def _relabel(labels):
 
 
 class RMSD(object):
+    # TODO: Docstring
 
     def __init__(self, transform='rigid', rotation_invariant=True, scale_invariant=True, pivot='cop'):
 
@@ -355,7 +356,7 @@ class RMSD(object):
 
 
 class MatchGraph(RMSD):
-
+    # TODO: Docstring
     def __init__(self, transform='rigid', scale_invariant=True, pivot='cop', isomorphism=False,
                  subgraph_isomorphism=False):
 
@@ -477,7 +478,7 @@ class MatchGraph(RMSD):
 
 
 class BNB(RMSD):
-
+    # TODO: Docstring
     def __init__(self, tol=1e-2, transform='rigid', scale_invariant=True, pivot='cop'):
 
         super(BNB, self).__init__(transform=transform, scale_invariant=scale_invariant, pivot=pivot)
@@ -529,7 +530,7 @@ class BNB(RMSD):
 
 
 class Node(object):
-
+    # TODO: Docstring
     def __init__(self, level, limits):
         self._level = level
         self._limits = limits

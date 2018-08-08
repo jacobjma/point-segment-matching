@@ -12,7 +12,8 @@ class PeakModel(object):
         return self._params
 
 class Polynomial2D(PeakModel):
-    
+    # TODO: Docstring
+
     def __init__(self):
         super(Polynomial2D, self).__init__()
     
@@ -34,7 +35,8 @@ class Polynomial2D(PeakModel):
         return np.linalg.solve(M, -self.params[1:3])
 
 class Gaussian2D(PeakModel):
-    
+    # TODO: Docstring
+
     def __init__(self, elliptical=False):
         
         super(Gaussian2D, self).__init__()
@@ -108,7 +110,8 @@ class Gaussian2D(PeakModel):
         return self.params[0], self.params[1]
 
 class Gaussian2DBatch(Gaussian2D):
-    
+    # TODO: Docstring
+
     def __init__(self, elliptical=False, n_samples=100):
         
         super(Gaussian2DBatch, self).__init__(elliptical=elliptical)

@@ -1,5 +1,4 @@
 import numpy as np
-from psm.geometry.qcp import rmsd_qcp
 
 
 def rmsd_kabsch(src, dst):
@@ -54,6 +53,12 @@ def rmsd_qcp_slow(src, dst):
     rmsd = np.sqrt(np.sum((np.dot(src, U) - dst) ** 2) / len(src))
 
     return rmsd
+
+
+try:
+    from psm.geometry.qcp import rmsd_qcp
+except:
+    rmsd_qcp = rmsd_qcp_slow
 
 
 def safe_rmsd(src, dst):

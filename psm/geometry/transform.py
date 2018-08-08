@@ -7,11 +7,12 @@ def rotate_points(points, angle, center='cop'):
     """Rotate point positions.
 
     Parameters:
-    angle = None:
+    angle: float
         Angle that the points are rotated
-    center = (0, 0, 0):
+    center: str or 2-tuple
         The center is kept fixed under the rotation. Use 
-        'COP' to fix the center of positions."""
+        'cop' to fix the center of positions.
+    """
 
     if isinstance(center, str):
         if center.lower() == 'cop':
@@ -28,6 +29,14 @@ def rotate_points(points, angle, center='cop'):
 
 
 def rotate_strain(strains, angles):
+    """Rotate the xy-directions of an array of strain tensors.
+
+    Parameters:
+    strains: Nx4x4 array
+        Array of N strain tensors
+    angle: float
+        Angle that the strain is rotated
+    """
     R = np.array([[np.cos(angles), np.sin(angles)],
                   [-np.sin(angles), np.cos(angles)]])
 
@@ -42,6 +51,7 @@ def rotate_strain(strains, angles):
 
 
 def scale_strain(strain, factor):
+    # TODO: Doncstring
     strain[:, 0, 0] = (1 + strain[:, 0, 0]) / (1 + factor) - 1
     strain[:, 1, 1] = (1 + strain[:, 1, 1]) / (1 + factor) - 1
     strain[:, 0, 1] = strain[:, 0, 1] / (1 + factor)

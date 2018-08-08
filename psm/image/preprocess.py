@@ -4,7 +4,7 @@ from scipy.ndimage.filters import gaussian_filter
 
 
 def normalize_range(image, vmin=0, vmax=1):
-    
+    # TODO: Docstring
     if vmax < vmin:
         raise ValueError()
     
@@ -13,7 +13,7 @@ def normalize_range(image, vmin=0, vmax=1):
     return vmin + (vmax-vmin)*image
 
 def local_normalization(image, sigma1, sigma2):
-
+    # TODO: Docstring
     image = normalize_range(image)
     
     image = image - gaussian_filter(image,sigma1)
@@ -23,7 +23,7 @@ def local_normalization(image, sigma1, sigma2):
     return image
 
 def remove_hot_pixels(image, threshold=.5, filter_size=3):
-    
+    # TODO: Docstring
     filtered = median_filter(image, size=filter_size)
     
     hot = normalize_range(image - filtered) > threshold
@@ -33,7 +33,7 @@ def remove_hot_pixels(image, threshold=.5, filter_size=3):
     return image
     
 def remove_dead_pixels(image, threshold=.5, filter_size=3):
-    
+    # TODO: Docstring
     filtered = median_filter(image, size=filter_size)
     
     dead = normalize_range(filtered - image) > threshold

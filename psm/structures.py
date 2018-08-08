@@ -8,7 +8,7 @@ from psm.graph.traversal import clockwise_traversal, clockwise_traversal_with_de
 from psm.utils import in_groups, relabel_groups, noobar
 
 
-def traverse_from_all(points, adjacency, max_per_point=np.inf, max_depth=None, progress_bar=False):
+def traverse_from_all(points, adjacency, max_per_point=1, max_depth=None, progress_bar=False):
     # TODO: Docstring
     clockwise = find_clockwise(points, adjacency)
 

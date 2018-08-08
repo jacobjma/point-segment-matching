@@ -10,6 +10,7 @@ from psm.structures import Structures
 
 
 def build_lattice_points(a, b, max_index, basis=None):
+    # TODO: Docstring
     a = np.array(a)
     b = np.array(b)
 
@@ -30,6 +31,7 @@ def build_lattice_points(a, b, max_index, basis=None):
 
 
 def build_lattice_dict(max_index, basis_size):
+    # TODO: Docstring
     h = range(-max_index, max_index + 1)
 
     indices = {}
@@ -41,6 +43,8 @@ def build_lattice_dict(max_index, basis_size):
 
 def lattice_traversal(a, b, basis=None, radius=None, max_depth=None, max_structures=np.inf, graph_func=None,
                       rmsd_calc=None, tol=1e-6):
+    # TODO: Docstring
+
     if basis is None:
         basis = np.array([[0., 0.]])
     else:
@@ -91,6 +95,7 @@ def lattice_traversal(a, b, basis=None, radius=None, max_depth=None, max_structu
 
 
 def regular_polygons(sidelength, sides):
+    # TODO: Docstring
     points = np.zeros((np.sum(sides), 2))
     segments = []
     adjacency = []

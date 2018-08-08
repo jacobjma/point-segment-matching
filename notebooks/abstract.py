@@ -8,7 +8,7 @@ from psm.graph import urquhart
 from psm.register import RMSD
 from psm.structures import traverse_from_all
 
-points = np.load('notebooks/data/poly_graphene.npy')
+points = np.load('data/poly_graphene.npy')
 
 adjacency = urquhart(points)
 
@@ -45,19 +45,19 @@ ax5 = plt.subplot2grid((2, 4), (1, 3))
 pointsize = 20
 fontsize = 18
 
-p = ax1.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c='k', s=point_size)
+p = ax1.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c='k', s=pointsize)
 ax1.set_title('Points', fontsize=fontsize)
 
 plotutils.graph_embedding(points, adjacency, ax=ax2)
 ax2.set_title('Geometric graph', fontsize=fontsize)
 
-p = ax3.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c=best_rmsd, cmap='viridis', vmin=0, vmax=.04, s=point_size)
+p = ax3.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c=best_rmsd, cmap='viridis', vmin=0, vmax=.04, s=pointsize)
 ax3.set_title('RMSD', fontsize=fontsize)
 
-p = ax4.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c=planar, cmap='coolwarm', vmin=-.1, vmax=.1, s=point_size)
+p = ax4.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c=planar, cmap='coolwarm', vmin=-.1, vmax=.1, s=pointsize)
 ax4.set_title('Strain', fontsize=fontsize)
 
-p = ax5.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c=rotation, cmap='hsv', s=point_size)
+p = ax5.scatter(structures.fronts[:, 0], structures.fronts[:, 1], c=rotation, cmap='hsv', s=pointsize)
 ax5.set_title('Rotation', fontsize=fontsize)
 
 for ax in (ax1, ax2, ax3, ax4, ax5):
@@ -67,4 +67,4 @@ for ax in (ax1, ax2, ax3, ax4, ax5):
 
 plt.tight_layout()
 
-plt.savefig('abstract.png')
+plt.savefig('abstract.png', dpi=60)

@@ -3,6 +3,8 @@ Point segment matching is a method for finding structure point clouds with repea
 
 ![abstract](/notebooks/abstract.png?raw=true "Polycrystaline graphene")
 
+To see how the above analysis was done see [example](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/poly_graphene_traversal.ipynb). You can also check out the [tutorial](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/tutorial_nanowire.ipynb)
+
 ## Installation
 Install manually after cloning the repository from Github:
 

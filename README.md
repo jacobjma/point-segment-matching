@@ -3,7 +3,9 @@ Point segment matching is a method for finding structure in 2d point clouds with
 
 In the image below the method is applied to a set of points representing polycrystalline graphene. The analysis clearly shows compressive strain along the grain boundaries and highlights the rotations of the grains.
 
-![abstract](/notebooks/abstract.png?raw=true "Polycrystaline graphene")
+<p align="center">
+  <img src="https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/abstract.png?raw=true" alt="Polycrystaline graphene"/>
+</p>
 
 See [example](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/poly_graphene_traversal.ipynb) for how the above analysis was done or check out the [tutorial](https://github.com/jacobjma/point-segment-matching/blob/master/notebooks/tutorial_nanowire.ipynb) for more information.
 

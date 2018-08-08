@@ -3,8 +3,31 @@ from copy import deepcopy
 
 import numpy as np
 
-from psm.graph.graphutils import subgraph
-from psm.utils import in_groups, relabel_groups
+from psm.graph.graphutils import subgraph, find_clockwise
+from psm.graph.traversal import clockwise_traversal, clockwise_traversal_with_depth
+from psm.utils import in_groups, relabel_groups, noobar
+
+
+def traverse_from_all(points, adjacency, max_per_point=np.inf, max_depth=None, progress_bar=False):
+    # TODO: Docstring
+    clockwise = find_clockwise(points, adjacency)
+
+    traversals = []
+    for i, point in enumerate(noobar(points, units='traversals')):
+        for j, k in enumerate(adjacency[i]):
+
+            edge = (i, k)
+
+            traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
+
+            traversals.append(traversal)
+
+            if i > max_per_point - 1:
+                break
+
+    structures = Structures(points, traversals, adjacency)
+
+    return structures
 
 
 def select_segments(indices, points, segments, adjacency=None):
@@ -20,7 +43,6 @@ def select_segments(indices, points, segments, adjacency=None):
     if adjacency is None:
         return points, segments
     else:
-
         return points, segments, adjacency
 
 
@@ -158,7 +180,7 @@ class Structures(object):
 
         return self.__class__(self.points, segments, self.adjacency)
 
-    def sample(self, fraction):
+    def sample(self, n):
         """ Return a random subsample.
         
         Parameters:
@@ -167,7 +189,9 @@ class Structures(object):
             The fraction of the structures to return.
         """
 
-        n = int(len(self) * fraction)
+        if not isinstance(n, numbers.Integral):
+            n = int(len(self) * n)
+
         indices = np.random.choice(len(self), n, replace=False)
         return self[indices]
 
@@ -209,10 +233,16 @@ class Structure(object):
     def center(self):
         return np.mean(self.points, axis=0)
 
-    def detach(self):
-        segments = [list(range(len(self)))]
-
-        return Structures(self.points, segments, self.adjacency)
+    def detach(self, indices=None):
+        if indices is None:
+            segments = [list(range(len(self)))]
+            return Structures(self.points, segments, self.adjacency)
+        else:
+            points = self.points[indices]
+            adjacency = subgraph(self.adjacency, indices)
+            clockwise = find_clockwise(points, adjacency)
+            segments = [clockwise_traversal((0, 1), adjacency, clockwise)]
+            return Structures(points, segments, adjacency)
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):

@@ -1,14 +1,12 @@
 import itertools
-import numbers
 
 import numpy as np
 
 from psm.graph.geometric import urquhart
-from psm.graph.graphutils import find_clockwise, subgraph
-from psm.graph.traversal import clockwise_traversal_with_depth, clockwise_traversal_with_depth_and_skips
+from psm.graph.graphutils import find_clockwise
+from psm.graph.traversal import clockwise_traversal_with_depth
 from psm.register import MatchGraph
 from psm.structures import Structures
-from psm.utils import flatten
 
 
 def build_lattice_points(a, b, max_index, basis=None):
@@ -41,15 +39,18 @@ def build_lattice_dict(max_index, basis_size):
     return indices
 
 
-def lattice_traversal(a, b, basis=None, radius=None, skips=None, max_depth=None, graph_func=None, rmsd_calc=None,
-                      tol=1e-6):
-    if graph_func is None:
-        graph_func = urquhart
-
+def lattice_traversal(a, b, basis=None, radius=None, max_depth=None, max_structures=np.inf, graph_func=None,
+                      rmsd_calc=None, tol=1e-6):
     if basis is None:
         basis = np.array([[0., 0.]])
     else:
         basis = np.array(basis, dtype=float)
+
+    if graph_func is None:
+        graph_func = urquhart
+
+    if rmsd_calc is None:
+        rmsd_calc = MatchGraph(transform='rigid', pivot='front')
 
     max_index = 11
 
@@ -64,26 +65,24 @@ def lattice_traversal(a, b, basis=None, radius=None, skips=None, max_depth=None,
     root = lattice_dict[(0, 0)][0]
 
     traversals = []
-    for i in adjacency[root]:
-        edge = (root, i)
+    for i, j in enumerate(adjacency[root]):
+        edge = (root, j)
 
-        if skips is None:
-            traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
-        else:
-            traversal, _ = clockwise_traversal_with_depth_and_skips(edge, adjacency, clockwise, max_depth, skips)
+        traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
 
         if radius is not None:
-            order = {j: i for i, j in enumerate(traversal)}
-            keep = np.where(np.linalg.norm(points[traversal], axis=1) <= radius)[0]
-            traversal = [traversal[i] for i in sorted(keep, key=order.get)]
+            order = {i: j for i, j in enumerate(traversal)}
+            keep = np.where(np.linalg.norm(points[traversal] - points[root], axis=1) <= radius)[0]
+            traversal = [order[i] for i in keep]
 
         traversals.append(traversal)
+
+        if i > max_structures - 1:
+            break
 
     structures = Structures(points, traversals, adjacency)
 
     if len(traversals) > 1:
-        rmsd_calc = MatchGraph(transform='rigid', pivot='front', isomorphism=True)
-
         rmsd_calc.register(structures, structures, progress_bar=False)
 
         return rmsd_calc.principal_structures(len(adjacency[0]), tol)

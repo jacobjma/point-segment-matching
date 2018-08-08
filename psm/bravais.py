@@ -3,7 +3,6 @@ from copy import copy
 import numpy as np
 from scipy.ndimage import gaussian_laplace
 from scipy.optimize import least_squares
-from tqdm import tqdm_notebook as tqdm
 
 from psm.graph.faces import face_adjacency, find_faces, connected_faces
 from psm.graph.geometric import urquhart
@@ -11,7 +10,7 @@ from psm.graph.graphutils import find_clockwise
 from psm.image.fitting import Polynomial2D
 from psm.image.peaks import find_local_peaks, refine_peaks
 from psm.structures import Structures, select_segments, segment_centers
-
+from psm.utils import noobar
 
 def _select_face_border(root_face, tail_face):
     border = set(root_face).intersection(set(tail_face))
@@ -260,7 +259,7 @@ def single_crystal_sweep(image, detector, num_peaks, min_sigma=1, step_size=1, m
     sigmas = np.arange(min_sigma, max_sigma, step_size)
 
     detectors = [copy(detector) for _ in sigmas]
-    for sigma, detector in tqdm(zip(sigmas, detectors), total=len(detectors), disable=not progress_bar):
+    for sigma, detector in noobar(zip(sigmas, detectors), num_iter=len(detectors), disable=not progress_bar):
         gl = -gaussian_laplace(image, sigma)
         points = find_local_peaks(gl, min_distance=10, exclude_border=1)  # .astype(float)
 

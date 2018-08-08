@@ -6,12 +6,12 @@ import scipy
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse.csgraph import connected_components
 from sklearn.cluster import DBSCAN
-from tqdm import tqdm_notebook as tqdm
 
 from psm.graph.graphutils import find_clockwise
 from psm.graph.isomorphism import check_isomorphism, subgraph_isomorphisms
 from psm.geometry.rmsd import safe_rmsd
 from psm.structures import Structures
+from psm.utils import noobar
 
 
 def _affine_transform(src, dst):
@@ -251,7 +251,7 @@ class RMSD(object):
 
         precalced = self._do_precalc(A, B)
 
-        for i, j in tqdm(indices, total=total, disable=not progress_bar):
+        for i, j in noobar(indices, num_iter=total, units='registrations', disable=not progress_bar):
 
             is_connected, permutations = self.is_connected(A[i], B[j])
 

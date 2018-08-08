@@ -75,7 +75,7 @@ def _initial_probes(adjacency, subgraph_order, subgraph_root_degree):
         traversal = np.zeros(subgraph_order, dtype=int)
         probe = Probe((0, i), traversal, 1, set((0,)), [])
 
-        adjacent = adjacent.copy()
+        adjacent = adjacency[0].copy()
         adjacent.remove(i)
 
         for combination in itertools.combinations(adjacent, k):
@@ -106,8 +106,7 @@ def _check_probe(probe, adjacency, subgraph_adjacency):
 
 
 def subgraph_isomorphisms(adjacency, clockwise, subgraph_adjacency):
-
-
+    # TODO: Can this be sped up?
     subgraph_order = len(subgraph_adjacency)
     adjacency_matrix = adjacency2matrix(adjacency)
     subgraph_adjacency_matrix = adjacency2matrix(subgraph_adjacency)

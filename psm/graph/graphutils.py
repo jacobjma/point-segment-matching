@@ -30,11 +30,15 @@ def adjacency2matrix(adjacency):
 
 def subgraph(adjacency, indices):
     if type(indices) is np.ndarray:
-        return [set(np.where(indices)[0][0] for j in adjacency[i] if j in indices) for i in indices]
-    elif type(indices) is list:
-        return [set(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
+        if indices.dtype is np.dtype('bool'):
+            if len(indices) != len(adjacency):
+                raise ValueError()
+
+            indices = np.where(indices)[0]
+
+        return [set(np.where(indices == j)[0][0] for j in adjacency[i] if j in indices) for i in indices]
     else:
-        raise ValueError()
+        return [set(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
 
 
 def find_clockwise(points, adjacency):

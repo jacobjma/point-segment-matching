@@ -1,12 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm_notebook as tqdm
 
 from psm.bravais import single_crystal_sweep, CrystalDetector
 from psm.gui import PointsEditor
 from psm.image.preprocess import normalize_range
 from psm.register import MatchGraph
-
+from psm.utils import noobar
 
 def gaussian_mask(width, ratio=1):
     return lambda x0, y0, x, y: np.exp(-(x0 - x) ** 2 / (2 * (width * ratio) ** 2) - (y0 - y) ** 2 / (2 * width ** 2))
@@ -27,6 +26,10 @@ def _fft_extent(n, d=1.0):
         return [-n / 2 / (d * n), (n / 2 - 1) / (d * n)]
     else:
         return [-(n - 1) / 2 / (d * n), (n - 1) / 2 / (d * n)]
+
+
+def _fft_extent_2d(shape, d=1.0):
+    return _fft_extent(shape[0], d) + _fft_extent(shape[1], d)
 
 
 class BraggFilter(object):
@@ -102,70 +105,37 @@ class BraggFilter(object):
 
     @property
     def reciprocal_lattice(self):
+        return self._pixels2nyquist(self._reciprocal_lattice)
 
-        extent = _fft_extent(self._fft_image.shape[0])
-        g1 = self._reciprocal_lattice[1] * (extent[1] - extent[0]) / self._fft_image.shape[0]
-        extent = _fft_extent(self._fft_image.shape[1])
-        g2 = self._reciprocal_lattice[0] * (extent[0] - extent[1]) / self._fft_image.shape[1]
-
-        return np.vstack((g1, g2))
-
-    def nyquist2pixels(self, vectors):
+    def _nyquist2pixels(self, vectors):
         vectors = vectors.copy()
-        extent = _fft_extent(self._fft_image.shape[0])
-        vectors[:,0] = vectors[:, 0] * self._fft_image.shape[0] / (extent[1] - extent[0])
-        extent = _fft_extent(self._fft_image.shape[1])
-        vectors[:,1] = vectors[:, 1] * self._fft_image.shape[1] / (extent[0] - extent[1])
+        extent = _fft_extent_2d(self._fft_image.shape)
+        vectors[:, 0] = vectors[:, 0] * self._fft_image.shape[0] / (extent[1] - extent[0])
+        vectors[:, 1] = vectors[:, 1] * self._fft_image.shape[1] / (extent[2] - extent[3])
         return vectors
 
-    def pixels2nyquist(self, vectors):
+    def _pixels2nyquist(self, vectors):
         vectors = vectors.copy()
-        extent = _fft_extent(self._fft_image.shape[0])
-        vectors[:,0] = vectors[:, 0] * (extent[1] - extent[0]) / self._fft_image.shape[0]
-        extent = _fft_extent(self._fft_image.shape[1])
-        vectors[:, 1] = vectors[:, 1] * (extent[0] - extent[1]) / self._fft_image.shape[1]
+        extent = _fft_extent_2d(self._fft_image.shape)
+        vectors[:, 0] = vectors[:, 0] * (extent[0] - extent[1]) / self._fft_image.shape[0]
+        vectors[:, 1] = vectors[:, 1] * (extent[3] - extent[2]) / self._fft_image.shape[1]
         return vectors
 
     def autoset_mask_centers(self, max_radius):
 
-        g1, g2 = self.pixels2nyquist(self._reciprocal_lattice)
-        print(g1,g2)
-        sss
+        g1, g2 = self._pixels2nyquist(self._reciprocal_lattice)
 
-        center = np.array(self._fft_image.shape) / 2
+        min_norm = np.min(np.linalg.norm([g1, g2], axis=0))
+
         centers = []
-        index_max = np.ceil(max_radius / np.linalg.norm(g1)).astype(int)
-        print(index_max)
+        index_max = np.ceil(max_radius / min_norm).astype(int)
         for h in range(-index_max, index_max + 1):
             for k in range(-index_max, index_max + 1):
                 center = h * g1 + k * g2
                 if np.linalg.norm(center) <= max_radius:
                     centers.append(center)
 
-
-
-        print(centers)
-
-        #self.centers = self.transform_centers(np.array(centers))
-
-    def transform_centers(self, centers):
-        new_centers = np.zeros_like(centers)
-
-        extent = _fft_extent(self._fft_image.shape[0])
-        new_centers[:, 0] = centers[:, 0] * (extent[1] - extent[0]) / self._fft_image.shape[0] + extent[0]
-        extent = _fft_extent(self._fft_image.shape[1])
-        new_centers[:, 1] = centers[:, 1] * (extent[0] - extent[1]) / self._fft_image.shape[1] + extent[1]
-
-        return new_centers
-
-    def untransform_centers(self, centers):
-        new_centers = np.zeros_like(centers)
-
-        extent = _fft_extent(self._fft_image.shape[0])
-        new_centers[:, 0] = (centers[:, 0] - extent[0]) * self._fft_image.shape[0] / (extent[1] - extent[0])
-        extent = _fft_extent(self._fft_image.shape[1])
-        new_centers[:, 1] = (centers[:, 1] - extent[1]) * self._fft_image.shape[1] / (extent[0] - extent[1])
-        return new_centers
+        self.centers = np.array(centers)
 
     def show_mask_centers(self, ax=None, scale=1, facecolors='none', edgecolors='r', **kwargs):
 
@@ -175,7 +145,7 @@ class BraggFilter(object):
         pow_spec = np.log(1 + scale * np.abs(self._fft_image)).T
 
         ax.imshow(pow_spec, cmap='gray', interpolation='nearest',
-                  extent=_fft_extent(self._fft_image.shape[0]) + _fft_extent(self._fft_image.shape[1]))
+                  extent=_fft_extent_2d(self._fft_image.shape))
 
         if self.centers is not None:
             ax.scatter(self.centers[:, 0], self.centers[:, 1], facecolors=facecolors,
@@ -183,7 +153,7 @@ class BraggFilter(object):
 
         return ax
 
-    def show_mask(self, ax, mask, **kwargs):
+    def show_mask(self, mask, ax=None, **kwargs):
 
         if ax is None:
             ax = plt.subplot()
@@ -196,7 +166,7 @@ class BraggFilter(object):
 
         return ax
 
-    def set_centers(self, centers):
+    def _set_centers(self, centers):
         self.centers = centers
 
     def edit_centers(self, scale=10, **kwargs):
@@ -223,7 +193,7 @@ class BraggFilter(object):
 
         self.pe = PointsEditor(ax, self.centers)
 
-        self.pe.edit(close_callback=self.set_centers, **kwargs)
+        self.pe.edit(close_callback=self._set_centers, **kwargs)
 
     def set_image(self, image):
         """Set the image to be filtered.
@@ -246,17 +216,23 @@ class BraggFilter(object):
 
         return mask_array
 
-    def _get_mask(self, shape, mask):
+    def _get_mask(self, shape, mask, progress_bar=True):
+        # TODO: Speed up mask calculation
         mask_array = np.zeros(shape)
 
-        points = self.untransform_centers(self.centers)
+        extent = _fft_extent_2d(self._fft_image.shape)
 
-        for point in tqdm(points):
-            mask_array += self._get_mask_array(point, shape, mask)
+        centers = self._nyquist2pixels(self.centers - np.array([extent[0], extent[-1]]))
+
+        for center in noobar(centers, disable=not progress_bar):
+            mask_array += self._get_mask_array(center, shape, mask)
+
+        mask_array[mask_array > 1] = 1
 
         return mask_array
 
-    def apply_filter(self, mask, image=None, return_mask=False):
+    def apply_filter(self, mask, image=None, return_mask=False, progress_bar=True):
+
         """Apply Bragg filter to image.
         
         Parameters
@@ -284,7 +260,7 @@ class BraggFilter(object):
         else:
             fft_image = np.fft.fftshift(np.fft.fft2(image))
 
-        mask_array = self._get_mask(fft_image.shape, mask)
+        mask_array = self._get_mask(fft_image.shape, mask, progress_bar=progress_bar)
 
         filtered_image = np.fft.fft2(np.fft.fftshift(fft_image * mask_array)).real
 

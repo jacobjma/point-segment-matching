@@ -107,6 +107,7 @@ def _order_exterior_vertices(simplices):
 
 
 def circumcenter_clustering(points, k=.5, min_points=2, return_faces=False):
+    # TODO: docstring
     simplices = scipy.spatial.Delaunay(points).simplices
 
     vertices = np.array([_calc_circumcenter(*points[s]) for s in simplices])

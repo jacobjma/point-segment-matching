@@ -31,11 +31,11 @@ def rmsd_qcp(np.ndarray[DTYPE_t, ndim=2] src, np.ndarray[DTYPE_t, ndim=2] dst):
 
     denom = xx_yy_u_2 + xy_yx_2
 
-    Uxx = (xx_yy_u_2 - xy_yx_2) / denom
-    Uxy = 2 * xy_yx * xx_yy_u / denom
-
     if denom == 0.:
         return np.nan
+
+    Uxx = (xx_yy_u_2 - xy_yx_2) / denom
+    Uxy = 2 * xy_yx * xx_yy_u / denom
 
     rmsd = 0
     for i in xrange(0,n_points):

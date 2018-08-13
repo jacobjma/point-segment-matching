@@ -7,10 +7,13 @@ ext_modules = [
         'psm.geometry.qcp',
         sources=['psm/geometry/qcp.pyx'],
         include_dirs=[np.get_include()]
+    ),
+    Extension(
+        'psm.graph.traversal',
+        sources=['psm/graph/traversal.pyx'],
+        include_dirs=[np.get_include()]
     )
 ]
-
-print(find_packages())
 
 setup(
     name='psm',

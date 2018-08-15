@@ -8,7 +8,7 @@ from scipy.sparse.csgraph import connected_components
 from sklearn.cluster import DBSCAN
 
 from psm.graph.graphutils import find_clockwise
-from psm.graph.isomorphism import check_isomorphism, subgraph_isomorphisms
+from psm.graph.isomorphism import check_isomorphism, subgraph_isomorphism
 from psm.geometry.rmsd import safe_rmsd
 from psm.structures import Structures
 from psm.utils import noobar

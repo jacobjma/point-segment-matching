@@ -4,7 +4,10 @@ import numpy as np
 
 from psm.graph.geometric import urquhart
 from psm.graph.graphutils import find_clockwise
-from psm.graph.traversal import clockwise_traversal_with_depth
+try:
+    from psm.graph.traversal import clockwise_traversal_with_depth
+except:
+    from psm.graph.traversal_slow import clockwise_traversal_with_depth
 from psm.register import MatchGraph
 from psm.structures import Structures
 

@@ -1,8 +1,5 @@
 import itertools
 
-import numpy as np
-
-from psm.graph.graphutils import adjacency2matrix
 from psm.graph.graphutils import subgraph
 from psm.graph.traversal_slow import clockwise_traversal
 
@@ -21,124 +18,78 @@ def check_isomorphism(adjacency, clockwise, other_adjacency):
     return False
 
 
-class Probe(object):
+class Traversal(object):
 
-    def __init__(self, edge, traversal, matched, marked, queue):
-        self._edge = edge
-        self._traversal = traversal
-        self._matched = matched
-        self._marked = marked
-        self._queue = queue
+    def __init__(self, edges, order, marked):
+        self.edges = edges
+
+        self.order = order
+
+        self.marked = marked
+
+    def __len__(self):
+        return len(self.order)
 
     @property
     def edge(self):
-        return self._edge
+        return self.edges[0]
 
-    @property
-    def traversal(self):
-        return self._traversal[:self.matched]
-
-    @property
-    def matched(self):
-        return self._matched
-
-    @property
-    def marked(self):
-        return self._marked
-
-    @property
-    def queue(self):
-        return self._queue
-
-    def propagate(self, edge):
-        self._traversal[self.matched] = edge[1]
-        self._matched += 1
-        self._edge = edge
-        self._marked.add(edge[1])
-        self._queue.append((edge[1], edge[0]))
-
-    def branch(self, edge, marked):
-        marked_copy = set(self.marked)
-        marked_copy.update(marked)
-
-        return self.__class__(edge, self._traversal.copy(), self.matched, marked_copy, self._queue.copy())
+    def copy(self):
+        return self.__class__(self.edges.copy(), self.order.copy(), self.marked.copy())
 
 
-def _initial_probes(adjacency, subgraph_order, subgraph_root_degree):
-    probes = []
-    k = len(adjacency[0]) - subgraph_root_degree
-
-    if k < 0:
-        return probes
-
+def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
+    outer_queue = []
     for i in adjacency[0]:
-        traversal = np.zeros(subgraph_order, dtype=int)
-        probe = Probe((0, i), traversal, 1, set((0,)), [])
+        outer_queue.append(Traversal([(0, i)], [], set()))
 
-        adjacent = adjacency[0].copy()
-        adjacent.remove(i)
-
-        for combination in itertools.combinations(adjacent, k):
-            child = probe.branch((0, i), combination)
-            probes.append(child)
-
-    return probes
-
-
-def _progate_probe(probe, adjacency, clockwise, subgraph_order):
-    edge = probe.edge
-    for i in range(len(adjacency[probe.edge[0]])):
-        edge = clockwise[edge]
-
-        if probe.matched == subgraph_order:
-            pass
-        elif not edge[1] in probe.marked:
-            probe.propagate(edge)
-
-
-def _check_probe(probe, adjacency, subgraph_adjacency):
-    adjacency = adjacency[probe.traversal[:probe.matched, None],
-                          probe.traversal[:probe.matched]]
-
-    subgraph_adjacency = subgraph_adjacency[:probe.matched, :probe.matched]
-
-    return np.all(adjacency == subgraph_adjacency)
-
-
-def subgraph_isomorphisms(adjacency, clockwise, subgraph_adjacency):
-    # TODO: Docstring
-    # TODO: Can this be sped up?
     subgraph_order = len(subgraph_adjacency)
-    adjacency_matrix = adjacency2matrix(adjacency)
-    subgraph_adjacency_matrix = adjacency2matrix(subgraph_adjacency)
+    subgraph_adjacents = [subgraph_adjacency[n] - set(range(n)) for n in range(subgraph_order)]
+    degree = [len(adjacent) for adjacent in adjacency]
 
-    result = []
-    outer_queue = _initial_probes(adjacency, subgraph_order, len(subgraph_adjacency[0]))
+    results = []
     while outer_queue:
-        probe = outer_queue.pop(0)
+        traversal = outer_queue.pop(0)
+        n = len(traversal)
 
-        _progate_probe(probe, adjacency, clockwise, subgraph_order)
+        if n == subgraph_order:
+            if subgraph(adjacency, traversal.order) == subgraph_adjacency:
+                results.append(traversal)
+            continue
 
-        if _check_probe(probe, adjacency_matrix, subgraph_adjacency_matrix):
+        elif len(traversal.edges) == 0:
+            pass
 
-            if probe.matched == subgraph_order:
-                result.append(probe)
-            elif len(probe.queue) == 0:
-                pass
-            else:
-                edge = probe.queue.pop(0)
-                subgraph_tail = np.nonzero(probe.traversal == edge[0])[0][0]
+        else:
+            edge = traversal.edges.pop(0)
 
-                k = len(adjacency[edge[0]]) - len(subgraph_adjacency[subgraph_tail])
+            if not edge[0] in traversal.marked:
 
-                if k < 0:
-                    pass
+                for i in range(degree[edge[0]]):
+                    edge = clockwise[edge]
+                    if edge[1] not in traversal.marked:
+                        traversal.edges.append((edge[1], edge[0]))
+
+                traversal.marked.add(edge[0])
+                traversal.order.append(edge[0])
+
+                adjacent = adjacency[edge[0]] - traversal.marked
+                discrepancy = len(adjacent) - len(subgraph_adjacents[n])
+
+                if discrepancy > 0:
+                    if len(subgraph_adjacents[n]) == 0:
+                        traversal.marked.update(adjacent)
+                        outer_queue.append(traversal)
+                    else:
+                        for combination in itertools.combinations(adjacent, discrepancy):
+                            outer_queue.append(traversal.copy())
+                            outer_queue[-1].marked.update(set(combination))
+                elif discrepancy < 0:
+                    # outer_queue.append(traversal)
+                    pass  # Is this OK?
                 else:
-                    adjacent = adjacency[edge[0]].copy()
-                    adjacent.remove(edge[1])
+                    outer_queue.append(traversal)
+            else:
+                outer_queue.append(traversal)
 
-                    for combination in itertools.combinations(adjacent, k):
-                        child = probe.branch(edge, combination)
-                        outer_queue.append(child)
-
-    return [probe.traversal for probe in result]
+    return results

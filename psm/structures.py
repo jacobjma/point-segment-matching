@@ -4,7 +4,10 @@ from copy import deepcopy
 import numpy as np
 
 from psm.graph.graphutils import subgraph, find_clockwise
-from psm.graph.traversal import clockwise_traversal, clockwise_traversal_with_depth
+try:
+    from psm.graph.traversal import clockwise_traversal, clockwise_traversal_with_depth
+except:
+    from psm.graph.traversal_slow import clockwise_traversal, clockwise_traversal_with_depth
 from psm.utils import in_groups, relabel_groups, noobar
 
 

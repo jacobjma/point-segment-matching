@@ -1,8 +1,9 @@
 import itertools
 
 import numpy as np
+from scipy.sparse.csgraph import connected_components
 
-from psm.utils import flatten
+from psm.utils import flatten, labels2groups
 
 
 def adjacency2edges(adjacency):
@@ -26,6 +27,11 @@ def adjacency2matrix(adjacency):
             matrix[i, j] = True
             matrix[j, i] = True
     return matrix
+
+
+def connected_pieces(adjacency):
+    connected = connected_components(adjacency2matrix(adjacency))[1]
+    return labels2groups(connected, sort_by_counts=True)
 
 
 def subgraph(adjacency, indices):

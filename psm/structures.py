@@ -61,11 +61,11 @@ class Structures(object):
     
     Parameters:
     ----------
-    points: ndarray of floats
+    points : ndarray of floats
         ndarray of shape (n,2) defining the xy-positions: [(x1,y1), (x2,y2), ...].
-    segments: list of lists of ints
+    segments : list of lists of ints
         Each segment is defined by the ints in a sublist.
-    adjacency: list of n sets of ints
+    adjacency : list of n sets of ints
         The adjacency of each point is defined by a set of ints.
     """
 

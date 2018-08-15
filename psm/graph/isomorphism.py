@@ -19,6 +19,7 @@ def check_isomorphism(adjacency, clockwise, other_adjacency):
 
 
 class Traversal(object):
+    """Helper class for subgraph isomorphism traversal"""
 
     def __init__(self, edges, order, marked):
         self.edges = edges
@@ -39,6 +40,18 @@ class Traversal(object):
 
 
 def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
+    # TODO : Implement in Cython
+    """Returns all clockwise ordered subgraph isomorphs.
+
+    Parameters:
+    ----------
+    adjacency : list of sets
+        Adjacency list of larger graph, ordered according to a clockwise traversal
+    clockwise : dict
+        Dictionary directed edges as keys mapping to the next adjacent edge in the clockwise direction.
+    subgraph_adjacency : list of sets
+        Adjacency list of smaller graph, ordered according to a clockwise traversal
+    """
     outer_queue = []
     for i in adjacency[0]:
         outer_queue.append(Traversal([(0, i)], [], set()))
@@ -86,7 +99,7 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
                             outer_queue[-1].marked.update(set(combination))
                 elif discrepancy < 0:
                     # outer_queue.append(traversal)
-                    pass  # Is this OK?
+                    pass  # TODO : Is this OK?
                 else:
                     outer_queue.append(traversal)
             else:

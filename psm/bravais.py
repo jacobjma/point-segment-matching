@@ -12,6 +12,8 @@ from psm.image.peaks import find_local_peaks, refine_peaks
 from psm.structures import Structures, select_segments, segment_centers
 from psm.utils import noobar
 
+# TODO : Cleanup this code
+
 def _select_face_border(root_face, tail_face):
     border = set(root_face).intersection(set(tail_face))
 

@@ -1,5 +1,6 @@
 import heapq
 import itertools
+import warnings
 
 import numpy as np
 import scipy
@@ -8,7 +9,12 @@ from scipy.sparse.csgraph import connected_components
 from sklearn.cluster import DBSCAN
 
 from psm.graph.graphutils import find_clockwise
-from psm.graph.isomorphism import check_isomorphism, subgraph_isomorphism
+from psm.graph.isomorphism_slow import check_isomorphism
+try:
+    from psm.graph.subgraph_isomorphism import subgraph_isomorphism
+except:
+    from psm.graph.isomorphism_slow import subgraph_isomorphism
+    warnings.warn('Fast Cython subgraph isomorphism module unavailable.')
 from psm.geometry.rmsd import safe_rmsd
 from psm.structures import Structures
 from psm.utils import noobar
@@ -69,10 +75,11 @@ class RMSD(object):
     def __init__(self, transform='rigid', rotation_invariant=True, scale_invariant=True, pivot='cop'):
 
         if transform not in ['rigid', 'similarity']:
-            raise NotImplementedError
+            raise ValueError()
 
         if pivot not in ['cop', 'front']:
-            raise NotImplementedError
+            raise ValueError()
+
 
         self.transform = transform
         self.scale_invariant = scale_invariant
@@ -383,7 +390,7 @@ class MatchGraph(RMSD):
 
             clockwise = find_clockwise(b.points, b.adjacency)
 
-            permutations = subgraph_isomorphisms(b.adjacency, clockwise, a.adjacency)
+            permutations = subgraph_isomorphism(b.adjacency, clockwise, a.adjacency)
 
             if len(permutations) > 0:
                 return True, permutations

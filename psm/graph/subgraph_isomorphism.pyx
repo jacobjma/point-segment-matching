@@ -1,22 +1,5 @@
 import itertools
-
 from psm.graph.graphutils import subgraph
-from psm.graph.traversal_slow import clockwise_traversal
-
-
-def check_isomorphism(adjacency, clockwise, other_adjacency):
-    """Returns True if two plane graphs rooted graphs are isomorphs else False"""
-
-    for i in adjacency[0]:
-        edge = (0, i)
-        traversal = clockwise_traversal(edge, adjacency, clockwise)
-        permuted_adjacency = subgraph(adjacency, traversal)
-
-        if permuted_adjacency == other_adjacency:
-            return True
-
-    return False
-
 
 class Traversal(object):
     """Helper class for subgraph isomorphism traversal"""
@@ -38,9 +21,8 @@ class Traversal(object):
     def copy(self):
         return self.__class__(self.edges.copy(), self.order.copy(), self.marked.copy())
 
-
 def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
-    # TODO : Implement in Cython
+
     """Returns all clockwise ordered subgraph isomorphs.
 
     Parameters:
@@ -71,7 +53,7 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
             continue
 
         elif len(traversal.edges) == 0:
-            pass
+            continue
 
         else:
             edge = traversal.edges.pop(0)
@@ -94,12 +76,16 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
                         traversal.marked.update(adjacent)
                         outer_queue.append(traversal)
                     else:
-                        for combination in itertools.combinations(adjacent, discrepancy):
-                            outer_queue.append(traversal.copy())
+                        for i, combination in enumerate(itertools.combinations(adjacent, discrepancy)):
+                            if i == 0:
+                                outer_queue.append(traversal)
+                            else:
+                                outer_queue.append(traversal.copy())
                             outer_queue[-1].marked.update(set(combination))
+
                 elif discrepancy < 0:
-                    # outer_queue.append(traversal)
-                    pass  # TODO : Is this OK?
+                    pass
+
                 else:
                     outer_queue.append(traversal)
             else:

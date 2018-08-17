@@ -20,10 +20,10 @@ start = time.time()
 for i in range(N):
     traversal = clockwise_traversal_slow(edge, adjacency, clockwise)
 end = time.time()
-print(end - start)
+print((end - start) / N)
 
 start = time.time()
 for i in range(N):
     traversal = clockwise_traversal(edge, adjacency, clockwise)
 end = time.time()
-print(end - start)
+print((end - start) / N)

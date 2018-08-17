@@ -12,6 +12,11 @@ ext_modules = [
         'psm.graph.traversal',
         sources=['psm/graph/traversal.pyx'],
         include_dirs=[np.get_include()]
+    ),
+    Extension(
+        'psm.graph.subgraph_isomorphism',
+        sources=['psm/graph/subgraph_isomorphism.pyx'],
+        include_dirs=[np.get_include()]
     )
 ]
 

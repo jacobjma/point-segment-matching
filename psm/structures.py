@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 
 from psm.graph.graphutils import subgraph, find_clockwise
+
 try:
     from psm.graph.traversal import clockwise_traversal, clockwise_traversal_with_depth
 except:
@@ -16,7 +17,7 @@ def traverse_from_all(points, adjacency, max_per_point=1, max_depth=None, progre
     clockwise = find_clockwise(points, adjacency)
 
     traversals = []
-    for i, point in enumerate(noobar(points, units='traversals')):
+    for i, point in enumerate(noobar(points, units='traversals', disable=not progress_bar)):
         for j, k in enumerate(adjacency[i]):
 
             edge = (i, k)

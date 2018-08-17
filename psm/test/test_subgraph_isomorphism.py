@@ -4,7 +4,7 @@ from psm import plotutils
 from psm.build import lattice_traversal
 from psm.graph.graphutils import subgraph, find_clockwise
 from psm.graph.traversal_slow import clockwise_traversal
-from psm.graph.isomorphism import subgraph_isomorphism
+from psm.graph.isomorphism_slow import subgraph_isomorphism
 
 import random
 
@@ -12,6 +12,7 @@ import random
 
 a = [1, 0]
 b = [0, 1]
+show_plots = True
 
 structures = lattice_traversal(a, b, max_depth=5)
 points = structures.points
@@ -41,7 +42,9 @@ subgraph_adjacency = subgraph(subgraph_adjacency, traversal)
 
 isomorphisms = subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency)
 
-assert len(isomorphisms) > 0
+if not show_plots:
+    assert len(isomorphisms) >= 4
+    quit()
 
 isomorphic_points = points[isomorphisms[0].order]
 isomorphic_adjacency = subgraph(adjacency, isomorphisms[0].order)

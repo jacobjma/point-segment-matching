@@ -46,8 +46,8 @@ if not show_plots:
     assert len(isomorphisms) >= 4
     quit()
 
-isomorphic_points = points[isomorphisms[0].order]
-isomorphic_adjacency = subgraph(adjacency, isomorphisms[0].order)
+isomorphic_points = points[isomorphisms[0]]
+isomorphic_adjacency = subgraph(adjacency, isomorphisms[0])
 
 fig, axes = plt.subplots(1, 3)
 plotutils.graph_embedding(points, adjacency, ax=axes[0])

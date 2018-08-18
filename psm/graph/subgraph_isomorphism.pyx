@@ -77,10 +77,10 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
                         outer_queue.append(traversal)
                     else:
                         for i, combination in enumerate(itertools.combinations(adjacent, discrepancy)):
-                            if i == 0:
-                                outer_queue.append(traversal)
-                            else:
-                                outer_queue.append(traversal.copy())
+                            #if i == 0:
+                            #    outer_queue.append(traversal)
+                            #else:
+                            outer_queue.append(traversal.copy())
                             outer_queue[-1].marked.update(set(combination))
 
                 elif discrepancy < 0:
@@ -91,4 +91,4 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
             else:
                 outer_queue.append(traversal)
 
-    return results
+    return [traversal.order for traversal in results]

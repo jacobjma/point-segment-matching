@@ -66,6 +66,7 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
         n = len(traversal)
 
         if n == subgraph_order:
+            print(traversal.order,subgraph(adjacency, traversal.order))
             if subgraph(adjacency, traversal.order) == subgraph_adjacency:
                 results.append(traversal)
             continue
@@ -95,17 +96,19 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
                         outer_queue.append(traversal)
                     else:
                         for i, combination in enumerate(itertools.combinations(adjacent, discrepancy)):
-                            if i == 0:
-                                outer_queue.append(traversal)
-                            else:
-                                outer_queue.append(traversal.copy())
+                            #if i == 0:
+                            #    outer_queue.append(traversal)
+                            #else:
+                            outer_queue.append(traversal.copy())
                             outer_queue[-1].marked.update(set(combination))
                 elif discrepancy < 0:
-                    # outer_queue.append(traversal)
+                    #outer_queue.append(traversal)
                     pass  # TODO : Is this OK?
                 else:
                     outer_queue.append(traversal)
             else:
                 outer_queue.append(traversal)
 
-    return results
+    print(results)
+
+    return [traversal.order for traversal in results]

@@ -11,11 +11,11 @@ from psm.utils import flatten
 
 
 def _ccw(a, b, c):
-    return np.cross(b - a, c -a) <= 0
+    return np.cross(b - a, c - a) <= 0
 
 
 def gabriel(points):
-    """Return the Gabriel Graph as an adjacency list."""
+    """Return the Gabriel graph as an adjacency list."""
 
     def intersect(a, b):
         return ((_ccw(a[0], b[0], b[1]) != _ccw(a[1], b[0], b[1])) &
@@ -46,7 +46,7 @@ def _simplex_edges(simplices):
 
 
 def urquhart(points):
-    """Return the Urquhart Graph as an adjacency list."""
+    """Return the Urquhart graph as an adjacency list."""
 
     simplices = scipy.spatial.Delaunay(points).simplices
     edges = _simplex_edges(simplices)
@@ -84,6 +84,40 @@ def _calc_circumcenter(p1, p2, p3):
     return np.array([x0, y0])
 
 
+def _aspect_ratio(A, B, C):
+    a = np.linalg.norm(A - B)
+    b = np.linalg.norm(B - C)
+    c = np.linalg.norm(C - A)
+    s = (a + b + c) / 2
+    return a * b * c / (8 * (s - a) * (s - b) * (s - c))
+
+
+def delaunay(points, tol=None):
+    """Return the Delaunay graph as an adjacency list."""
+    simplices = scipy.spatial.Delaunay(points).simplices
+
+    if tol is not None:
+        ar = np.array([_aspect_ratio(*points[s]) for s in simplices])
+        simplices = simplices[ar < tol]
+
+    edges = _simplex_edges(simplices)
+    edges = np.array([list(edge) for edge in edges])
+    return edges2adjacency(edges, len(points))
+
+
+def knn(points, k):
+    """Return the k-nearest neighbors graph as an adjacency list."""
+    nbrs = NearestNeighbors(n_neighbors=k).fit(points)
+    _, groups = nbrs.kneighbors(points)
+    groups = groups[:, 1:]
+
+    adjacency = []
+    for group in groups:
+        adjacency.append(set(list(group)))
+
+    return adjacency
+
+
 def _directed_simplex_edges(simplices):
     edges = [[(simplex[i - 1], simplex[i]) for i in range(3)] for simplex in simplices]
     return flatten(edges)
@@ -106,7 +140,7 @@ def _order_exterior_vertices(simplices):
     return order
 
 
-def circumcenter_clustering(points, k=.5, min_points=2, return_faces=False):
+def circumcenter_clustering(points, tol=.5, min_points=2, return_faces=False):
     # TODO: docstring
     simplices = scipy.spatial.Delaunay(points).simplices
 
@@ -115,7 +149,7 @@ def circumcenter_clustering(points, k=.5, min_points=2, return_faces=False):
     nbrs = NearestNeighbors(n_neighbors=2).fit(points)
     distances, indices = nbrs.kneighbors(points)
 
-    eps = k * np.median(distances[:, 1])
+    eps = tol * np.median(distances[:, 1])
     estimator = DBSCAN(eps=eps, min_samples=min_points)
 
     labels = estimator.fit_predict(vertices)

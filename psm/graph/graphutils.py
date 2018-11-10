@@ -1,20 +1,23 @@
-import itertools
-
 import numpy as np
 from scipy.sparse.csgraph import connected_components
 
-from psm.utils import flatten, labels2groups
+from psm.utils import labels2groups
 
 
 def adjacency2edges(adjacency):
-    edges = [frozenset(itertools.product([i], vertices)) for i, vertices in enumerate(adjacency)]
-    return set(flatten(edges))
+    edges = set()
+    for i, adjacent in enumerate(adjacency):
+        for j in adjacent:
+            edges.add(frozenset((i, j)))
+
+    return [list(edge) for edge in edges]
 
 
 def edges2adjacency(edges, num_nodes):
-    adjacency = [set() for i in range(num_nodes)]
+    adjacency = [set() for _ in range(num_nodes)]
 
     for edge in edges:
+        edge = list(edge)
         adjacency[edge[0]].add(edge[1])
         adjacency[edge[1]].add(edge[0])
     return adjacency
@@ -35,16 +38,20 @@ def connected_pieces(adjacency):
 
 
 def subgraph(adjacency, indices):
-    if type(indices) is np.ndarray:
-        if indices.dtype is np.dtype('bool'):
-            if len(indices) != len(adjacency):
-                raise ValueError()
+    return [frozenset(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
 
-            indices = np.where(indices)[0]
 
-        return [set(np.where(indices == j)[0][0] for j in adjacency[i] if j in indices) for i in indices]
-    else:
-        return [set(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
+# def subgraph(adjacency, indices):
+#     if type(indices) is np.ndarray:
+#         if indices.dtype is np.dtype('bool'):
+#             if len(indices) != len(adjacency):
+#                 raise ValueError()
+#
+#             indices = np.where(indices)[0]
+#
+#         return [set(np.where(indices == j)[0][0] for j in adjacency[i] if j in indices) for i in indices]
+#     else:
+#         return [set(indices.index(j) for j in adjacency[i] if j in indices) for i in indices]
 
 
 def find_clockwise(points, adjacency):

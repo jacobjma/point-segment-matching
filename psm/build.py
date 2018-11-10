@@ -2,14 +2,9 @@ import itertools
 
 import numpy as np
 
-from psm.graph.geometric import urquhart
+from psm.segments import Segments
 from psm.graph.graphutils import find_clockwise
-try:
-    from psm.graph.traversal import clockwise_traversal_with_depth
-except:
-    from psm.graph.traversal_slow import clockwise_traversal_with_depth
-from psm.register import MatchGraph
-from psm.structures import Structures
+from psm.graph.traversal_slow import clockwise_traversal_with_depth
 
 
 def build_lattice_points(a, b, max_index, basis=None):
@@ -44,75 +39,60 @@ def build_lattice_dict(max_index, basis_size):
     return indices
 
 
-def lattice_traversal(a, b, basis=None, radius=None, max_depth=None, max_structures=np.inf, graph_func=None,
-                      rmsd_calc=None, tol=1e-6):
+def lattice(a, b, max_index, basis=None):
     # TODO: Docstring
+    return Segments(build_lattice_points(a, b, max_index, basis))
 
+
+def lattice_segment(a, b, max_depth, min_alpha=0, basis=None, max_index=None):
+    # TODO: Docstring
     if basis is None:
         basis = np.array([[0., 0.]])
     else:
         basis = np.array(basis, dtype=float)
 
-    if graph_func is None:
-        graph_func = urquhart
+    if max_index is None:
+        max_index = 11
 
-    if rmsd_calc is None:
-        rmsd_calc = MatchGraph(transform='rigid', pivot='front')
+    segments = lattice(a=a, b=b, max_index=max_index, basis=basis)
 
-    max_index = 11
+    segments.build_graph(min_alpha)
 
-    points = build_lattice_points(a, b, max_index, basis)
+    root = build_lattice_dict(max_index, len(basis))[(0, 0)][0]
+    edge = (root, next(iter(segments.adjacency[root])))
 
-    lattice_dict = build_lattice_dict(max_index, len(basis))
+    clockwise = find_clockwise(segments.points, segments.adjacency)
 
-    adjacency = graph_func(points)
+    traversal, _ = clockwise_traversal_with_depth(edge, segments.adjacency, clockwise, max_depth)
 
-    clockwise = find_clockwise(points, adjacency)
+    segments._indices = [traversal]
 
-    root = lattice_dict[(0, 0)][0]
-
-    traversals = []
-    for i, j in enumerate(adjacency[root]):
-        edge = (root, j)
-
-        traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
-
-        if radius is not None:
-            order = {i: j for i, j in enumerate(traversal)}
-            keep = np.where(np.linalg.norm(points[traversal] - points[root], axis=1) <= radius)[0]
-            traversal = [order[i] for i in keep]
-
-        traversals.append(traversal)
-
-        if i > max_structures - 1:
-            break
-
-    structures = Structures(points, traversals, adjacency)
-
-    if len(traversals) > 1:
-        rmsd_calc.register(structures, structures, progress_bar=False)
-
-        return rmsd_calc.principal_structures(len(adjacency[0]), tol)
-    else:
-        return structures
+    return segments
 
 
-def regular_polygons(sidelength, sides):
+def regular_polygon_points(sidelength, n):
+    points = np.zeros((n, 2))
+
+    L = sidelength / (2 * np.sin(np.pi / n))
+
+    points[:, 0] = np.cos(np.arange(n) * 2 * np.pi / n) * L
+    points[:, 1] = np.sin(np.arange(n) * 2 * np.pi / n) * L
+
+    return points
+
+
+def regular_polygon(sidelength, n):
+    points = regular_polygon_points(sidelength, n)
+    adjacency = [set(((j - 1) % n, (j + 1) % n)) for j in range(n)]
+    segments = [range(n)]
+    return Segments(points, segments, adjacency)
+
+
+def regular_polygons(sidelength, n_sides):
     # TODO: Docstring
-    points = np.zeros((np.sum(sides), 2))
-    segments = []
-    adjacency = []
 
-    i = 0
-    for n in sides:
-        L = sidelength / (2 * np.sin(np.pi / n))
+    segments = Segments()
+    for n in n_sides:
+        segments.extend(regular_polygon(sidelength, n))
 
-        points[i:i + n, 0] = np.cos(np.arange(n) * 2 * np.pi / n) * L
-        points[i:i + n, 1] = np.sin(np.arange(n) * 2 * np.pi / n) * L
-
-        segments.append(range(i, i + n))
-        adjacency += [set((i + (j - 1) % n, i + (j + 1) % n)) for j in range(n)]
-
-        i += n
-
-    return Structures(points, segments, adjacency)
+    return segments

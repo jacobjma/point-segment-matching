@@ -1,0 +1,440 @@
+import numbers
+from collections import defaultdict
+from copy import deepcopy
+
+import numpy as np
+import scipy.spatial
+
+import psm.cluster
+from psm import plotutils
+from psm.geometry import transform
+from psm.graph import geometric
+from psm.graph.faces import find_faces, find_outer_face, traverse_perimeter, convex_hull
+from psm.graph.graphutils import subgraph, adjacency2edges, edges2adjacency
+from psm.match import RMSD
+from psm.utils import in_groups, relabel_groups
+
+try:
+    from psm.graph.traversal import clockwise_traversal, clockwise_traversal_with_depth
+except:
+    from psm.graph.traversal_slow import clockwise_traversal, clockwise_traversal_with_depth, \
+        breadth_first_traversal_with_depth
+
+
+def traverse_from(points, adjacency, max_depth=None, origins=None):
+    # TODO: Docstring
+
+    if origins is None:
+        origins = range(len(points))
+
+    traversals = []
+    for origin in origins:
+        traversals.append(breadth_first_traversal_with_depth(origin, adjacency, max_depth))
+
+    return traversals
+
+
+def _aspect_ratio(A, B, C):
+    a = np.linalg.norm(A - B)
+    b = np.linalg.norm(B - C)
+    c = np.linalg.norm(C - A)
+    s = (a + b + c) / 2
+    return a * b * c / (8 * (s - a) * (s - b) * (s - c))
+
+
+def select_segments(indices, points, segments, adjacency=None):
+    if adjacency is not None:
+        adjacency = subgraph(adjacency, sorted(in_groups(segments)))
+
+    segments = [segments[i] for i in indices]
+
+    points = points[sorted(in_groups(segments))]
+
+    segments = relabel_groups(segments)
+
+    if adjacency is None:
+        return points, segments
+    else:
+        return points, segments, adjacency
+
+
+class Segments(object):
+    """Segments object.
+
+    The Segments object represents segments of a larger group of
+    points and its assigned geometric graph. 
+    
+    Parameters:
+    ----------
+    points : ndarray of floats
+        ndarray of shape (n,2) defining the xy-positions: [(x1,y1), (x2,y2), ...].
+    indices : list of lists of ints
+        Each segment is defined by the ints in a sublist.
+    adjacency : list of n sets of ints
+        The adjacency of each point is defined by a set of ints.
+    """
+
+    def __init__(self, points=None, indices=None, adjacency=None):
+
+        if points is None:
+            self._points = np.zeros((0, 2))
+        else:
+            self._points = points
+
+        if indices is None:
+            self._indices = []
+        else:
+            self._indices = indices
+
+        if adjacency is None:
+            self._adjacency = [set() for _ in range(len(self._points))]
+        else:
+            self._adjacency = adjacency
+
+        self._rmsd_calc = None
+        self._strain = None
+
+    @property
+    def points(self):
+        return self._points
+
+    @property
+    def indices(self):
+        return self._indices
+
+    @property
+    def adjacency(self):
+        return self._adjacency
+
+    @property
+    def edges(self):
+        return adjacency2edges(self._adjacency)
+
+    @property
+    def fronts(self):
+        """Return the first point of each segment."""
+
+        return np.array([segment.front for segment in self])
+
+    @property
+    def centers(self):
+        """Return the center of positions of each segment."""
+
+        return np.array([segment.center for segment in self])
+
+    @property
+    def rmsd_calc(self):
+        return self._rmsd_calc
+
+    def set_point(self, i, new_position):
+        self._points[i] = new_position
+
+    def copy(self):
+        """Return a copy."""
+
+        indices = deepcopy(self.indices)
+        adjacency = deepcopy(self.adjacency)
+        return self.__class__(self.points, indices, adjacency)
+
+    def extend(self, other):
+
+        n = len(self.points)
+
+        self._points = np.vstack((self.points, other.points))
+
+        self._indices += [[n + i for i in segment] for segment in other.indices]
+
+        self._adjacency += [set(n + i for i in adjacent) for adjacent in other.adjacency]
+
+    def add_segments(self, other):
+        """Extend structures object by appending indices from *other*."""
+
+        if not np.all(self._points == other._points):
+            raise RuntimeError()
+
+        if not self._adjacency == other._adjacency:
+            raise RuntimeError()
+
+        self._indices += other._indices
+
+        return self
+
+    def __add__(self, other):
+        structures = self.copy()
+        structures += other
+        return structures
+
+    __iadd__ = add_segments
+
+    def __len__(self):
+        return len(self.indices)
+
+    def __delitem__(self, i):
+
+        if isinstance(i, numbers.Integral):
+            del self._indices[i]
+        else:
+            for j in sorted(i, reverse=True):
+                del self._indices[j]
+
+    def __getitem__(self, i):
+
+        """Return a subset of the structures.
+
+        i -- scalar integer, list of integers, or slice object
+        describing which atoms to return.
+
+        If i is a scalar, return a Structure object. If i is a list or a
+        slice, return a Structures object with the same associated info 
+        as the original Structures object.
+        """
+
+        if isinstance(i, numbers.Integral):
+            if i < -len(self) or i >= len(self):
+                raise IndexError('Index out of range.')
+
+            return Segment(segments=self, index=i)
+
+        if isinstance(i, slice):
+            indices = self.indices[i]
+        else:
+            indices = [self.indices[j] for j in i]
+
+        return self.__class__(self.points, indices, self.adjacency)
+
+    def sample(self, n):
+        """ Return a random subsample.
+
+        Parameters:
+        ----------
+        fraction: float
+            The fraction of the structures to return.
+        """
+
+        if not isinstance(n, numbers.Integral):
+            n = int(len(self) * n)
+
+        if n == 1:
+            return self.copy()
+        else:
+            indices = np.random.choice(len(self), n, replace=False)
+            return self[indices]
+
+    def build_graph(self, min_alpha=0, n_neighbors=None, max_aspect=None):
+
+        self._threshold_graph(min_alpha=min_alpha, n_neighbors=n_neighbors, max_aspect=max_aspect)
+
+    def _threshold_graph(self, edges=None, min_alpha=0, n_neighbors=None, max_aspect=np.inf):
+
+        simplices = scipy.spatial.Delaunay(self.points).simplices
+
+        if max_aspect is not None:
+            ar = np.array([_aspect_ratio(*self.points[s]) for s in simplices])
+            simplices = simplices[ar < max_aspect]
+
+        alphas = geometric.delaunay_edge_stability(self.points, simplices)
+
+        if n_neighbors is not None:
+            adjacency = edges2adjacency(alphas.keys(), len(self.points))
+
+            faces = find_faces(self.points, adjacency, remove_outer_face=False)
+
+            outer_face = faces[find_outer_face(self.points, adjacency, faces)]
+
+            min_alpha = geometric.estimate_min_alpha(alphas, n_neighbors, exclude=outer_face)
+
+        if edges is None:
+            edges = alphas.keys()
+
+        edges = [edge for edge in edges if alphas[frozenset(edge)] >= min_alpha]
+
+        self._adjacency = edges2adjacency(edges, len(self.points))
+
+        return alphas
+
+    def threshold_graph(self, min_alpha=0, n_neighbors=None):
+
+        edges = adjacency2edges(self.adjacency)
+
+        self._threshold_graph(edges=edges, min_alpha=min_alpha, n_neighbors=n_neighbors)
+
+    def traversals(self, max_depth, set_indices=True, origins=None):
+
+        if origins is None:
+            origins = range(len(self.points))
+
+        if max_depth == 1:
+            traversals = [[origin] for origin in origins]
+        else:
+            traversals = []
+            for origin in origins:
+                traversals.append(breadth_first_traversal_with_depth(origin, self.adjacency, max_depth))
+
+        if set_indices:
+            self._indices = traversals
+
+        return traversals
+
+    def trim(self, min_degree=None):
+
+        new_indices = []
+
+        if min_degree is not None:
+            for segment in self:
+                degrees = segment.degrees
+                new_indices.append([j for i, j in enumerate(segment.indices) if degrees[i] >= min_degree])
+
+        self._indices = new_indices
+
+    def complete_faces(self):
+
+        faces = self.faces(set_indices=False)
+
+        face_references = defaultdict(list)
+        for i, face in enumerate(faces):
+            for j in face:
+                face_references[j].append(i)
+
+        new_indices = []
+
+        for segment in self:
+            segment_faces = set(l for k in set(j for i in segment.indices for j in face_references[i]) for l in faces[k])
+            segment_faces = list(segment_faces - set(segment.indices))
+            new_indices.append(segment.indices + segment_faces)
+
+        self._indices = new_indices
+
+    def outer_face(self):
+
+        faces = self.faces(set_indices=False, remove_outer_face=False)
+
+        return faces[find_outer_face(self.points, self.adjacency, faces)]
+
+    def faces(self, set_indices=True, remove_outer_face=True):
+        faces = find_faces(self.points, self.adjacency, remove_outer_face)
+
+        if set_indices:
+            self._indices = faces
+
+        return faces
+
+    def prinpical_structure(self, **kwargs):
+        clusterer = psm.cluster.Cluster(**kwargs)
+        clusterer.fit(self)
+        return clusterer.principal_structures(1)
+
+    def show(self, n=1, axes=None, nrows=1, show_order=False, sample=False, **kwargs):
+
+        if sample:
+            segments = self.sample(n)
+        else:
+            segments = self
+
+        return plotutils.show_segments(segments, n=n, axes=axes, nrows=nrows, show_order=show_order, **kwargs)
+
+    def show_edges(self, ax=None, c='k', color_mode='edges', **kwargs):
+
+        plotutils.edge_plot(self, ax=ax, c=c, color_mode=color_mode, **kwargs)
+
+    def register(self, other, rmsd_calc=None, progress_bar=True, **kwargs):
+        if rmsd_calc is None:
+            self._rmsd_calc = RMSD(**kwargs)
+
+        return self._rmsd_calc.register(other, self, progress_bar=progress_bar)
+
+    def best_matches(self):
+        return self.rmsd_calc.best_matches(self)
+
+    def calc_strain(self, adjust_zero=None, match='best', rmsd_max=np.inf):
+        strain, rotation = self.rmsd_calc.calc_strain(self, match=match, rmsd_max=rmsd_max)
+
+        if adjust_zero is 'median':
+            strain = transform.zero_median(strain)
+        elif adjust_zero is 'mean':
+            raise NotImplementedError()
+        elif adjust_zero is not None:
+            raise ValueError()
+
+        return strain, rotation
+
+
+class Segment(object):
+
+    def __init__(self, segments, index):
+        self.__dict__['_index'] = index
+        self.__dict__['_segments'] = segments
+
+    def __len__(self):
+        return len(self.indices)
+
+    @property
+    def index(self):
+        return self._index
+
+    @property
+    def segments(self):
+        return self._segments
+
+    @property
+    def points(self):
+        return self.segments.points[self.indices]
+
+    @property
+    def indices(self):
+        return self.segments.indices[self.index]
+
+    @indices.setter
+    def indices(self, new_indices):
+        self.segments.indices[self.index] = new_indices
+
+    @property
+    def adjacency(self):
+        return subgraph(self.segments.adjacency, self.indices)
+
+    @property
+    def degrees(self):
+        return [len(adjacent) for adjacent in self.adjacency]
+
+    @property
+    def edges(self):
+        return adjacency2edges(self.adjacency)
+
+    @property
+    def front(self):
+        return self.points[0]
+
+    @property
+    def center(self):
+        return np.mean(self.points, axis=0)
+
+    def perimeter(self):
+        return traverse_perimeter(self.points, self.adjacency)
+
+    def hull(self):
+        return convex_hull(self.points, self.adjacency)
+
+    def show(self, ax=None, c='k', show_order=False):
+        plotutils.show_segment(self, ax=ax, c=c, show_order=show_order)
+
+    def set_point(self, i, new_position):
+        i = self.indices[i]
+        self.segments.points[i] = new_position
+
+    def detach(self, segment_indices=None):
+        if segment_indices is None:
+            indices = [list(range(len(self)))]
+            return Segments(self.points, indices, self.adjacency)
+        else:
+            points = self.points[segment_indices]
+            indices = [list(range(len(segment_indices)))]
+            adjacency = subgraph(self.adjacency, segment_indices)
+            return Segments(points, indices, adjacency)
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return (self.segments == other.segments) & (self.index == other.index)
+
+    def __hash__(self):
+        return hash((self.segments, self.index))

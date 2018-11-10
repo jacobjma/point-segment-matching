@@ -1,126 +1,60 @@
-from copy import copy
+from collections import deque
 
 import numpy as np
-from scipy.ndimage import gaussian_laplace
 from scipy.optimize import least_squares
 
-from psm.graph.faces import face_adjacency, find_faces, connected_faces
-from psm.graph.geometric import urquhart
-from psm.graph.graphutils import find_clockwise
-from psm.image.fitting import Polynomial2D
-from psm.image.peaks import find_local_peaks, refine_peaks
-from psm.structures import Structures, select_segments, segment_centers
-from psm.utils import noobar
-
-# TODO : Cleanup this code
-
-def _select_face_border(root_face, tail_face):
-    border = set(root_face).intersection(set(tail_face))
-
-    indices = sorted([root_face.index(i) for i in border])
-
-    if len(border.intersection(set((root_face[0], root_face[-1])))) == 2:
-        tail = root_face[indices[1]]
-        head = root_face[indices[0]]
-    else:
-        tail = root_face[indices[0]]
-        head = root_face[indices[1]]
-
-    return (tail, head)
+from psm.cluster import Cluster
+from psm.graph.faces import connected_faces
+from psm.match import FaceMatcher, RMSD
+from psm.segments import Segments, select_segments
 
 
-def _miller_traversal(edge, faces, adjacency, clockwise):
-    hk = {edge[0]: [0, 0], edge[1]: [1, 0]}
-    queue = [edge]
+def assign_miller(faces, vectors, seed=0):
+    edge2face = {}
+    for i, face in enumerate(faces):
+        for j in range(len(face)):
+            edge2face[(face[j - 1], face[j])] = i
+
+    next_vector = {}
+    for i in range(len(vectors)):
+        next_vector[vectors[i - 1]] = vectors[i]
+        next_vector[(-vectors[i - 1][0], -vectors[i - 1][1])] = (-vectors[i][0], -vectors[i][1])
+
+    miller = {faces[seed][0]: (0, 0)}
+    queue = deque([(faces[seed][1], faces[seed][0])])
+    marked = set((seed,))
+    for i, j in enumerate(faces[seed][1:]):
+        miller[j] = (miller[faces[seed][i]][0] + vectors[i][0],
+                     miller[faces[seed][i]][1] + vectors[i][1])
+
+        queue.append((faces[seed][(i + 2) % len(faces[seed])], faces[seed][i + 1]))
 
     while queue:
-        edge = queue.pop(0)
-        old_edge = edge
+        edge = queue.pop()
 
-        root_face = faces[old_edge[0]]
-        tail_face = faces[old_edge[1]]
-        border = _select_face_border(root_face, tail_face)
+        try:
+            face_idx = edge2face[edge]
 
-        for i in range(len(adjacency[edge[0]])):
-            edge = clockwise[edge]
+        except KeyError:
+            pass
 
-            if not edge[1] in hk.keys():
+        else:
+            if face_idx not in marked:
+                face = faces[face_idx]
+                marked.add(face_idx)
+                first = face.index(edge[1])
+                for i in range(len(face)):
+                    i = (i + first) % len(face)
+                    queue.append((face[i], face[i - 1]))
 
-                if hk[old_edge[0]][0] == hk[old_edge[1]][0]:
-                    index_of_change = 1
-                else:
-                    index_of_change = 0
+                    if face[i] not in miller.keys():
+                        vector = (miller[face[i - 1]][0] - miller[face[i - 2]][0],
+                                  miller[face[i - 1]][1] - miller[face[i - 2]][1])
 
-                sign_of_change = -(hk[old_edge[0]][index_of_change] - hk[old_edge[1]][index_of_change])
+                        vector = next_vector[vector]
 
-                hk[edge[1]] = hk[old_edge[0]].copy()
-
-                if border[0] in faces[edge[1]]:
-                    hk[edge[1]][1 - index_of_change] += sign_of_change * (2 * (index_of_change) - 1)
-
-                elif border[1] in faces[edge[1]]:
-                    hk[edge[1]][1 - index_of_change] -= sign_of_change * (2 * (index_of_change) - 1)
-
-                else:
-                    hk[edge[1]][index_of_change] -= sign_of_change
-
-                queue.append((edge[1], edge[0]))
-
-    return hk
-
-
-def assign_miller_to_faces(points, faces):
-    adjacency = face_adjacency(faces)
-
-    centers = segment_centers(points, faces)
-
-    clockwise = find_clockwise(centers, adjacency)
-
-    root = 0
-    edge = (root, next(iter(adjacency[root])))
-
-    miller = _miller_traversal(edge, faces, adjacency, clockwise)
-
-    return miller
-
-
-def assign_miller_to_corners(points, faces):
-    adjacency = face_adjacency(faces)
-
-    face_id = 0
-    face = faces[face_id]
-    miller = {i: hk for i, hk in zip(face, [[0, 0], [1, 0], [1, 1], [0, 1]])}
-    marked = set((face_id,))
-    queue = [(i, face_id) for i in adjacency[face_id]]
-
-    while queue:
-        face_id, old_face_id = queue.pop()
-
-        if face_id in marked:
-            continue
-
-        marked.add(face_id)
-        queue += [(i, face_id) for i in adjacency[face_id]]
-
-        old_face = faces[old_face_id]
-        face = faces[face_id]
-        border = select_border(old_face, face)
-
-        i = (faces[face_id].index(border[-1]) - 1)
-        for l in range(len(face) - 2):
-            i = i - l
-            j = (i + 1) % len(face)
-            k = (i + 2) % len(face)
-
-            if miller[face[j]][0] == miller[face[k]][0]:
-                index_of_change = 0
-            else:
-                index_of_change = 1
-
-            sign_of_change = miller[face[k]][1 - index_of_change] - miller[face[j]][1 - index_of_change]
-
-            miller[face[i]] = miller[face[j]].copy()
-            miller[face[i]][index_of_change] += sign_of_change * (2 * (index_of_change) - 1)
+                        miller[face[i]] = (miller[face[i - 1]][0] + vector[0],
+                                           miller[face[i - 1]][1] + vector[1])
 
     return miller
 
@@ -157,118 +91,83 @@ def fit_lattice_parameters(miller):
     return a, b, x0
 
 
-class CrystalDetector(object):
+class BravaisDetector(object):
 
-    def __init__(self, rmsd_calc, rmsd_max, graph_func=None):
-        self.rmsd_calc = rmsd_calc
+    def __init__(self, rmsd_max, sample=1):
 
         self.rmsd_max = rmsd_max
+        self.sample = sample
 
-        if graph_func is None:
-            self.graph_func = urquhart
-        else:
-            self.graph_func = graph_func
-
-        self._points = None
-        self._faces = None
-        self._adjacency = None
-
-        self._indices = []
-        self._crystal_rmsd = None
-        self._principal_structure = None
-        self._pieces = []
+        self._segments = None
+        self._pieces = None
+        self._rmsd = None
 
     def detect(self, points):
-        self._points = points
 
-        self._adjacency = self.graph_func(points)
+        self._segments = Segments(points)
+        self._segments.build_graph()
+        self._segments.faces()
 
-        self._faces = find_faces(points, self._adjacency)
-
-        structures = Structures(self._points, self._faces, self._adjacency)
-
-        rmsd = self.rmsd_calc.register(structures, structures, progress_bar=False)
-
-        if len(rmsd) > 0:
-            principal_structure = self.rmsd_calc.principal_structures(1, self.rmsd_max)
-            rmsd = self.rmsd_calc.register(principal_structure, structures, progress_bar=False)
+        if self.sample < 1:
+            sample = self._segments.sample(self.sample)
         else:
-            return None
+            sample = self._segments
 
-        if len(rmsd) > 0:
-            self._rmsd = rmsd[0]
+        rmsd_calc = RMSD(transform='rigid', pivot='cop', matcher=FaceMatcher())
 
-            mask = ~np.isnan(self._rmsd)
+        clusterer = Cluster(eps=self.rmsd_max, min_samples=1, rmsd_calc=rmsd_calc)
+        clusterer.fit(sample, progress_bar=False)
+        principal_structure = clusterer.principal_structures(1, self.rmsd_max)
 
-            mask[mask] &= self._rmsd[mask] < self.rmsd_max
-            self._rmsd[mask] = np.nan
+        rmsd = rmsd_calc.register(principal_structure, self._segments)[0]
 
-            self._indices = np.where(mask)[0]
+        mask = ~np.isnan(rmsd)
+        mask[mask] &= rmsd[mask] < self.rmsd_max
+        rmsd[~mask] = np.nan
 
-            points, faces = select_segments(self._indices, self._points, self._faces)
+        indices = np.where(mask)[0]
 
-            self._pieces = connected_faces(faces)
+        crystal_faces = [self._segments.indices[i] for i in indices]
 
-            return self._indices
-        else:
-            return None
+        self._pieces = [[indices[i] for i in piece] for piece in connected_faces(crystal_faces)]
+        self._rmsd = rmsd
 
-    def crystal_points(self):
-        return self._points[np.unique([self._faces[i] for i in self._indices])]
+    @property
+    def n_faces(self):
+        return sum([len(piece) for piece in self._pieces])
 
-    def average_crystal_rmsd(self):
-        return np.sum(self._rmsd[self._indices]) / len(self._indices)
-
-    def num_crystal_faces(self):
-        return len(self._indices)
-
-    def get_crystal(self):
-        points, faces, adjacency = select_segments(self._indices, self._points, self._faces, self._adjacency)
-        return Structures(points, faces, adjacency)
+    @property
+    def rmsd(self):
+        return self._rmsd
 
     def get_crystal_piece(self, i):
-        points, faces, adjacency = select_segments(self._pieces[i], self._points, self._faces, self._adjacency)
-        return Structures(points, faces, adjacency)
+        piece = self._pieces[i]
 
-    def get_miller_indices(self, sites='faces'):
+        points, faces = select_segments(piece, self._segments._points, self._segments._indices)
 
-        structures = self.get_crystal_piece(0)
+        adjacency = [set() for i in range(len(points))]
+        for face in faces:
+            for i in range(len(face)):
+                adjacency[face[i - 1]].update(set((face[i - 2], face[i])))
 
-        if sites == 'faces':
-            return assign_miller_to_faces(structures.points, structures.segments)
-        elif sites == 'corners':
-            return assign_miller_to_corners(structures.points, structures.segments)
-        else:
-            raise ValueError()
+        return Segments(points, faces, adjacency)
 
-    def get_lattice_parameters(self, sites='faces'):
+    def get_miller_indices(self):
 
-        structures = self.get_crystal_piece(0)
+        segments = self.get_crystal_piece(0)
+
+        vectors = [(0, 1), (1, -1), (-1, 0)]
+
+        return assign_miller(segments.indices, vectors)
+
+    def get_lattice_parameters(self):
+
+        segments = self.get_crystal_piece(0)
 
         miller = self.get_miller_indices()
 
-        miller = {(h, k): structures.centers[i] for i, (h, k) in miller.items()}
+        miller = {(h, k): segments.points[i] for i, (h, k) in miller.items()}
 
         a, b, x0 = fit_lattice_parameters(miller)
 
         return a, b, x0
-
-
-def single_crystal_sweep(image, detector, num_peaks, min_sigma=1, step_size=1, max_sigma=None, progress_bar=False):
-    if max_sigma is None:
-        max_sigma = np.max(image.shape) // 2
-
-    sigmas = np.arange(min_sigma, max_sigma, step_size)
-
-    detectors = [copy(detector) for _ in sigmas]
-    for sigma, detector in noobar(zip(sigmas, detectors), num_iter=len(detectors), disable=not progress_bar):
-        gl = -gaussian_laplace(image, sigma)
-        points = find_local_peaks(gl, min_distance=10, exclude_border=1)  # .astype(float)
-
-        gl_val = gl[points[:, 0], points[:, 1]]
-        points = points[np.argsort(-gl_val)][:num_peaks]
-        points = refine_peaks(gl, points, model=Polynomial2D(), extent=3)
-
-        indices = detector.detect(points)
-
-    return detectors

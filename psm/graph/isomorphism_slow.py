@@ -40,7 +40,6 @@ class Traversal(object):
 
 
 def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
-    # TODO : Implement in Cython
     """Returns all clockwise ordered subgraph isomorphs.
 
     Parameters:
@@ -66,7 +65,6 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
         n = len(traversal)
 
         if n == subgraph_order:
-            print(traversal.order,subgraph(adjacency, traversal.order))
             if subgraph(adjacency, traversal.order) == subgraph_adjacency:
                 results.append(traversal)
             continue
@@ -108,7 +106,5 @@ def subgraph_isomorphism(adjacency, clockwise, subgraph_adjacency):
                     outer_queue.append(traversal)
             else:
                 outer_queue.append(traversal)
-
-    print(results)
 
     return [traversal.order for traversal in results]

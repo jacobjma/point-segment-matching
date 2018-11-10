@@ -1,13 +1,74 @@
-import itertools
 from collections import defaultdict
 
 import numpy as np
 import scipy.spatial
 from sklearn.cluster import DBSCAN
 from sklearn.neighbors import NearestNeighbors
+from scipy import optimize
 
 from psm.graph.graphutils import edges2adjacency
 from psm.utils import flatten
+from psm.graph.faces import find_faces, find_outer_face
+
+
+def _calc_angle(p, r, q):
+    rp = p - r
+    rq = q - r
+    return np.arccos(np.dot(rp, rq) /
+                     (np.linalg.norm(rp) * np.linalg.norm(rq)))
+
+
+def delaunay_edge_stability(points, simplices):
+
+    alphas = defaultdict(lambda: np.pi)
+    for i, simplex in enumerate(simplices):
+        for j in range(3):
+            p = simplex[j - 1]
+            r = simplex[j - 2]
+            q = simplex[j]
+
+            alphas[frozenset((p, q))] -= _calc_angle(*points[[p, r, q]])
+
+    return dict(alphas)
+
+
+def estimate_min_alpha(alphas, n_neighbors, exclude=[]):
+
+    node_alphas = defaultdict(list)
+    for edge, alpha in alphas.items():
+        edge = list(edge)
+        node_alphas[edge[0]].append(alpha)
+        node_alphas[edge[1]].append(alpha)
+
+    node_alphas = [sorted(values) for node, values in node_alphas.items() if node not in exclude]
+
+    def fun(alpha):
+        return - sum([n_neighbors == sum(i > alpha for i in j) for j in node_alphas])
+
+    minimum = optimize.brute(fun, ranges=((0, np.pi),))
+
+    return minimum[0]
+
+
+def stable_delaunay(points, min_alpha=0, max_aspect=np.inf):
+    simplices = scipy.spatial.Delaunay(points).simplices
+
+    if max_aspect is not None:
+        ar = np.array([_aspect_ratio(*points[s]) for s in simplices])
+        simplices = simplices[ar < max_aspect]
+
+    edges = _simplex_edges(simplices)
+
+    alphas = delaunay_edge_stability(points)
+
+    edges = [edge for edge in edges if alphas[edge] >= min_alpha]
+
+    # edges = [edge for edge, alpha in alphas.items() if alpha >= min_alpha]
+    # alphas = {edge : alpha for edge, alpha in alphas.items() if alpha >= min_alpha}
+
+    adjacency = edges2adjacency(edges, len(points))
+
+    return adjacency, alphas
 
 
 def _ccw(a, b, c):
@@ -66,6 +127,51 @@ def urquhart(points):
     return edges2adjacency(edges, len(points))
 
 
+def _aspect_ratio(A, B, C):
+    a = np.linalg.norm(A - B)
+    b = np.linalg.norm(B - C)
+    c = np.linalg.norm(C - A)
+    s = (a + b + c) / 2
+    return a * b * c / (8 * (s - a) * (s - b) * (s - c))
+
+
+def delaunay(points, max_aspect=None):
+    """Return the Delaunay graph as an adjacency list."""
+    simplices = scipy.spatial.Delaunay(points).simplices
+
+    if max_aspect is not None:
+        ar = np.array([_aspect_ratio(*points[s]) for s in simplices])
+        simplices = simplices[ar < max_aspect]
+
+    edges = _simplex_edges(simplices)
+    edges = np.array([list(edge) for edge in edges])
+
+    return edges2adjacency(edges, len(points))
+
+
+def knn(points, k, condition='bilateral'):
+    """Return the k-nearest neighbors graph as an adjacency list."""
+    nbrs = NearestNeighbors(n_neighbors=k + 1).fit(points)
+    _, groups = nbrs.kneighbors(points)
+    groups = groups[:, 1:]
+
+    adjacency = [set(list(group)) for group in groups]
+
+    if condition is 'bilateral':
+        for i, adjacent in enumerate(adjacency):
+            for j in adjacent:
+                if i not in adjacency[j]:
+                    adjacency[i] = adjacency[i] - {j}
+    elif condition is 'unilateral':
+        for i, adjacent in enumerate(adjacency):
+            for j in adjacent:
+                adjacency[j].add(i)
+    else:
+        raise ValueError()
+
+    return adjacency
+
+
 def _calc_circumcenter(p1, p2, p3):
     x1, y1 = p1
     x2, y2 = p2
@@ -82,40 +188,6 @@ def _calc_circumcenter(p1, p2, p3):
     x0 = -bx / (2 * a)
     y0 = -by / (2 * a)
     return np.array([x0, y0])
-
-
-def _aspect_ratio(A, B, C):
-    a = np.linalg.norm(A - B)
-    b = np.linalg.norm(B - C)
-    c = np.linalg.norm(C - A)
-    s = (a + b + c) / 2
-    return a * b * c / (8 * (s - a) * (s - b) * (s - c))
-
-
-def delaunay(points, tol=None):
-    """Return the Delaunay graph as an adjacency list."""
-    simplices = scipy.spatial.Delaunay(points).simplices
-
-    if tol is not None:
-        ar = np.array([_aspect_ratio(*points[s]) for s in simplices])
-        simplices = simplices[ar < tol]
-
-    edges = _simplex_edges(simplices)
-    edges = np.array([list(edge) for edge in edges])
-    return edges2adjacency(edges, len(points))
-
-
-def knn(points, k):
-    """Return the k-nearest neighbors graph as an adjacency list."""
-    nbrs = NearestNeighbors(n_neighbors=k).fit(points)
-    _, groups = nbrs.kneighbors(points)
-    groups = groups[:, 1:]
-
-    adjacency = []
-    for group in groups:
-        adjacency.append(set(list(group)))
-
-    return adjacency
 
 
 def _directed_simplex_edges(simplices):

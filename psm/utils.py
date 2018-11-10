@@ -28,24 +28,43 @@ def relabel_groups(groups):
     return [[mapping[i] for i in group] for group in groups]
 
 
-def noobar(itrble, units='', description='', update_every=5, num_iter=None, disable=False):
+class ProgressBar(object):
+
+    def __init__(self, num_iter, units='', description='', update_every=5, disable=False):
+
+        self._num_iter = num_iter
+        self._units = units
+        self._description = description
+        self._update_every = update_every
+        self._disable = disable
+
+        self._intervals = 100 // update_every
+        self._last_update = None
+
+    def print(self, i):
+
+        if not self._disable:
+            self._print(i)
+
+    def _print(self, i):
+
+        p = int((i + 1) / self._num_iter * self._intervals) * self._update_every
+
+        if p != self._last_update:
+            self._last_update = p
+            progress_bar = ('|' * (p // self._update_every)).ljust(self._intervals)
+            print('{} [{}] {}/{} {}'.format(self._description, progress_bar, i + 1, self._num_iter, self._units))
+            clear_output(wait=True)
+
+def bar(itrble, num_iter=None, **kwargs):
     """Simple progress bar. tqdm slows down tight loops!"""
+
     if num_iter is None:
         num_iter = len(itrble)
 
-    intervals = 100 // update_every
+    progress_bar = ProgressBar(num_iter, **kwargs)
 
-    last_update = None
     for i, j in enumerate(itrble):
         yield j
 
-        if disable:
-            continue
-
-        p = int((i + 1) / num_iter * intervals) * update_every
-
-        if p != last_update:
-            last_update = p
-            progress_bar = ('|' * (p // update_every)).ljust(intervals)
-            print('{} [{}] {}/{} {}'.format(description, progress_bar, i + 1, num_iter, units))
-            clear_output(wait=True)
+        progress_bar.print(i)

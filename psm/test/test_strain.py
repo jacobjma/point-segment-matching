@@ -1,12 +1,12 @@
+import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import erf
-import matplotlib.pyplot as plt
 
 from psm.build import build_lattice_points, lattice_traversal
-from psm.register import RMSD
-from psm.structures import traverse_from_all
 from psm.graph.geometric import urquhart
+from psm.match import RMSD
 from psm.plotutils import add_colorbar
+from psm.segments import traverse_from_all
 
 
 def continuum_strain(points, W, A):

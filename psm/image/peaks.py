@@ -1,9 +1,12 @@
+from copy import copy
+
 import numpy as np
 from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.ndimage.measurements import center_of_mass, label
+from scipy.ndimage import gaussian_laplace
 
-from psm.utils import noobar
-
+from psm.utils import bar
+from psm.image.fitting import Polynomial2D
 
 def find_local_peaks(image, min_distance, threshold=0, local_threshold=0,
                      exclude_border=0, exclude_adjacent=False):
@@ -127,7 +130,7 @@ def refine_peaks(image, points, model, extent=3, region_shape='disk', progress_b
     u = u[region] - r[0]
     v = v[region] - r[1]
 
-    for i, p in enumerate(noobar(points, units='fits', disable=not progress_bar)):
+    for i, p in enumerate(bar(points, units='fits', disable=not progress_bar)):
         x = X[p[0] - r[0]:p[0] + r[0] + 1, p[1] - r[1]:p[1] + r[1] + 1]
         y = Y[p[0] - r[0]:p[0] + r[0] + 1, p[1] - r[1]:p[1] + r[1] + 1]
 
@@ -139,3 +142,23 @@ def refine_peaks(image, points, model, extent=3, region_shape='disk', progress_b
         refined[i, :] = [x0 + p[0], y0 + p[1]]
 
     return refined
+
+
+def single_crystal_sweep(image, detector, num_peaks, min_sigma=1, step_size=1, max_sigma=None, progress_bar=False):
+    if max_sigma is None:
+        max_sigma = np.max(image.shape) // 2
+
+    sigmas = np.arange(min_sigma, max_sigma, step_size)
+
+    detectors = [copy(detector) for _ in sigmas]
+    for sigma, detector in bar(zip(sigmas, detectors), num_iter=len(detectors), disable=not progress_bar):
+        gl = -gaussian_laplace(image, sigma)
+        points = find_local_peaks(gl, min_distance=10, exclude_border=1)  # .astype(float)
+
+        gl_val = gl[points[:, 0], points[:, 1]]
+        points = points[np.argsort(-gl_val)][:num_peaks]
+        points = refine_peaks(gl, points, model=Polynomial2D(), extent=3)
+
+        indices = detector.detect(points)
+
+    return detectors

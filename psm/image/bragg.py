@@ -1,24 +1,81 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from psm.bravais import single_crystal_sweep, CrystalDetector
-from psm.gui import PointsEditor
+from psm.bravais import BravaisDetector
+from psm.image.peaks import single_crystal_sweep
+from psm.gui_old import PointsEditor
 from psm.image.preprocess import normalize_range
-from psm.register import MatchGraph
-from psm.utils import noobar
-
-def gaussian_mask(width, ratio=1):
-    return lambda x0, y0, x, y: np.exp(-(x0 - x) ** 2 / (2 * (width * ratio) ** 2) - (y0 - y) ** 2 / (2 * width ** 2))
 
 
-def butterworth_mask(width, ratio=1, order=3):
-    r = lambda x0, y0, x, y: np.sqrt(((x0 - x) / ratio) ** 2 + (y0 - y) ** 2) / width
-    return lambda x0, y0, x, y: np.sqrt(1 / (1 + r(x0, y0, x, y) ** (2. * order)))
+class Mask(object):
+
+    def __init__(self, width, ratio=None):
+        self._width = width
+        self._ratio = ratio
+        self._shape = None
+
+    def set_shape(self, shape):
+        self._shape = shape
+        if self._ratio is None:
+            self._ratio = shape[0] / shape[1]
+
+    def indices(self, center):
+        center_round = np.round(center).astype(int)
+
+        width_x, width_y = self.mask_array_widths()
+
+        min_x = np.max((center_round[0] - width_x, 0))
+        max_x = np.min((center_round[0] + width_x + 1, self._shape[0]))
+        min_y = np.max((center_round[1] - width_y, 0))
+        max_y = np.min((center_round[1] + width_y + 1, self._shape[1]))
+
+        return np.mgrid[min_x:max_x, min_y:max_y]
+
+    def mask_array_widths(self):
+        return int(5 * self._width * self._ratio), int(5 * self._width)
 
 
-def cosine_mask(width, ratio=1):
-    r = lambda x0, y0, x, y: np.sqrt(((x0 - x) / ratio) ** 2 + (y0 - y) ** 2) / (width / 2)
-    return lambda x0, y0, x, y: (1. / 2 + np.cos(r(x0, y0, x, y)) / 2.) * (r(x0, y0, x, y) < np.pi)
+class GaussianMask(Mask):
+
+    def __init__(self, width, ratio=None):
+        super(GaussianMask, self).__init__(width, ratio)
+
+    def apply(self, center):
+        x0, y0 = center
+        x, y = self.indices(center)
+
+        return x, y, np.exp(
+            -(x0 - x) ** 2 / (2 * (self._width * self._ratio) ** 2) - (y0 - y) ** 2 / (2 * self._width ** 2))
+
+
+class ButterworthMask(Mask):
+
+    def __init__(self, width, ratio=None, order=4):
+        super(ButterworthMask, self).__init__(width, ratio)
+
+        self._order = order
+
+    def apply(self, center):
+        x0, y0 = center
+        x, y = self.indices(center)
+
+        r = lambda x0, y0, x, y: np.sqrt(((x0 - x) / self._ratio) ** 2 + (y0 - y) ** 2) / self._width
+
+        return x, y, np.sqrt(1 / (1 + r(x0, y0, x, y) ** (2. * self._order)))
+
+
+class CosineMask(Mask):
+
+    def __init__(self, width, ratio):
+        super(CosineMask, self).__init__(width, ratio)
+
+    def apply(self, center):
+        x0, y0 = center
+        x, y = self.indices(center)
+
+        r = lambda x0, y0, x, y: np.sqrt(((x0 - x) / self._ratio) ** 2 + (y0 - y) ** 2) / (self._width / 2)
+
+        return x, y, (1. / 2 + np.cos(r(x0, y0, x, y)) / 2.) * (r(x0, y0, x, y) < np.pi)
 
 
 def _fft_extent(n, d=1.0):
@@ -55,7 +112,7 @@ class BraggFilter(object):
 
         self._reciprocal_lattice = None
 
-    def register_diffraction_peaks(self, rmsd_max=.1, alpha=1, num_peaks=9, **kwargs):
+    def register_diffraction_peaks(self, rmsd_max, num_peaks=9, **kwargs):
 
         """Finds the reciprocal lattice of a single crystal. 
         
@@ -83,23 +140,21 @@ class BraggFilter(object):
             Additional keyword arguments for stm.find_local_peaks
         """
 
-        power_spectrum = np.log(1 + alpha * np.abs(self._fft_image))
+        power_spectrum = np.log(1 + 1 * np.abs(self._fft_image))
 
-        rmsd_calc = MatchGraph(transform='rigid', scale_invariant=True, pivot='cop')
-
-        detector = CrystalDetector(rmsd_calc, rmsd_max)
+        detector = BravaisDetector(rmsd_max)
 
         detectors = single_crystal_sweep(power_spectrum, detector, num_peaks, **kwargs)
 
-        num_crystal_faces = [detector.num_crystal_faces() for detector in detectors]
+        n_faces = [detector.n_faces for detector in detectors]
 
-        best = [detector for detector in detectors if detector.num_crystal_faces() == max(num_crystal_faces)]
+        best = [detector for detector in detectors if detector.n_faces == max(n_faces)]
 
-        average_crystal_rmsd = [detector.average_crystal_rmsd() for detector in best]
+        rmsd = [np.mean(detector.rmsd) for detector in best]
 
-        best = best[average_crystal_rmsd.index(min(average_crystal_rmsd))]
+        best = best[rmsd.index(min(rmsd))]
 
-        g1, g2, _ = best.get_lattice_parameters('corners')
+        g1, g2, _ = best.get_lattice_parameters()
 
         self._reciprocal_lattice = np.vstack((g1, g2))
 
@@ -144,12 +199,10 @@ class BraggFilter(object):
 
         pow_spec = np.log(1 + scale * np.abs(self._fft_image)).T
 
-        ax.imshow(pow_spec, cmap='gray', interpolation='nearest',
-                  extent=_fft_extent_2d(self._fft_image.shape))
+        ax.imshow(pow_spec, cmap='gray', interpolation='nearest', extent=_fft_extent_2d(self._fft_image.shape))
 
         if self.centers is not None:
-            ax.scatter(self.centers[:, 0], self.centers[:, 1], facecolors=facecolors,
-                       edgecolors=edgecolors, **kwargs)
+            ax.scatter(self.centers[:, 0], self.centers[:, 1], facecolors=facecolors, edgecolors=edgecolors, **kwargs)
 
         return ax
 
@@ -165,9 +218,6 @@ class BraggFilter(object):
         ax.imshow(mask_array.T, extent=_fft_extent(shape[0]) + _fft_extent(shape[1]), **kwargs)
 
         return ax
-
-    def _set_centers(self, centers):
-        self.centers = centers
 
     def edit_centers(self, scale=10, **kwargs):
         """Edit the mask centers.
@@ -193,7 +243,10 @@ class BraggFilter(object):
 
         self.pe = PointsEditor(ax, self.centers)
 
-        self.pe.edit(close_callback=self._set_centers, **kwargs)
+        def _set_centers(centers):
+            self.centers = centers
+
+        self.pe.edit(close_callback=_set_centers, **kwargs)
 
     def set_image(self, image):
         """Set the image to be filtered.
@@ -206,17 +259,13 @@ class BraggFilter(object):
 
         self._fft_image = np.fft.fftshift(np.fft.fft2(image))
 
-    def _get_mask_array(self, point, shape, mask):
+    def _get_mask_array(self, center, x, y, mask):
 
-        x, y = np.mgrid[0:shape[0], 0:shape[1]]
-
-        mask_array = np.zeros(shape)
-
-        mask_array = mask_array + mask(point[0], point[1], x, y)
+        mask_array = mask.apply(center[0], center[1], x, y)
 
         return mask_array
 
-    def _get_mask(self, shape, mask, progress_bar=True):
+    def _get_mask(self, shape, mask):
         # TODO: Speed up mask calculation
         mask_array = np.zeros(shape)
 
@@ -224,14 +273,18 @@ class BraggFilter(object):
 
         centers = self._nyquist2pixels(self.centers - np.array([extent[0], extent[-1]]))
 
-        for center in noobar(centers, disable=not progress_bar):
-            mask_array += self._get_mask_array(center, shape, mask)
+        mask.set_shape(shape)
+
+        for center in centers:
+            x, y, mask_values = mask.apply(center)
+
+            mask_array[x, y] += mask_values
 
         mask_array[mask_array > 1] = 1
 
         return mask_array
 
-    def apply_filter(self, mask, image=None, return_mask=False, progress_bar=True):
+    def apply_filter(self, mask, image=None, return_mask=False):
 
         """Apply Bragg filter to image.
         
@@ -260,7 +313,7 @@ class BraggFilter(object):
         else:
             fft_image = np.fft.fftshift(np.fft.fft2(image))
 
-        mask_array = self._get_mask(fft_image.shape, mask, progress_bar=progress_bar)
+        mask_array = self._get_mask(fft_image.shape, mask)
 
         filtered_image = np.fft.fft2(np.fft.fftshift(fft_image * mask_array)).real
 

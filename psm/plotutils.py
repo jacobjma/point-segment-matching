@@ -86,7 +86,6 @@ def _halfspace(p1, p2, tol=1e-12):
 
 def _inscribed_radius(polygon, center, tol=1e-12):
     min_r2 = np.inf
-
     for j in range(len(polygon)):
         p1 = polygon[j - 1]
         p2 = polygon[j]
@@ -101,7 +100,10 @@ def _inscribed_radius(polygon, center, tol=1e-12):
 
         min_r2 = min(min_r2, r2)
 
-    return r2
+    try:
+        return r2
+    except:
+        return 0
 
 
 def voronoi_polygons(segments):

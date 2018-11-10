@@ -298,7 +298,8 @@ class Segments(object):
         new_indices = []
 
         for segment in self:
-            segment_faces = set(l for k in set(j for i in segment.indices for j in face_references[i]) for l in faces[k])
+            segment_faces = set(
+                l for k in set(j for i in segment.indices for j in face_references[i]) for l in faces[k])
             segment_faces = list(segment_faces - set(segment.indices))
             new_indices.append(segment.indices + segment_faces)
 
@@ -419,6 +420,11 @@ class Segment(object):
     def set_point(self, i, new_position):
         i = self.indices[i]
         self.segments.points[i] = new_position
+
+    def add_points(self, new_points):
+        self.segments._indices[self.index] = self.segments.indices[self.index] + [len(self.segments.points) + i for i
+                                                                                  in range(len(new_points))]
+        self.segments._points = np.vstack((self.segments.points, new_points))
 
     def detach(self, segment_indices=None):
         if segment_indices is None:

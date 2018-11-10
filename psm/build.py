@@ -81,10 +81,18 @@ def regular_polygon_points(sidelength, n):
     return points
 
 
-def regular_polygon(sidelength, n):
+def regular_polygon(sidelength, n, include_center=False):
     points = regular_polygon_points(sidelength, n)
     adjacency = [set(((j - 1) % n, (j + 1) % n)) for j in range(n)]
     segments = [range(n)]
+
+    if include_center is True:
+        points = np.vstack(([[0, 0]], points))
+        adjacency = [set(range(1, n + 1))] + [set((((j - 1) % n)+1, ((j + 1) % n)+1)) for j in range(n)]
+        for adjacent in adjacency[1:]:
+            adjacent.add(0)
+        segments = [range(n + 1)]
+
     return Segments(points, segments, adjacency)
 
 

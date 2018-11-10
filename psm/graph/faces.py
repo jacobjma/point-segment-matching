@@ -151,6 +151,9 @@ def _perimeter2hull(perimeter):
     new_perimeter = perimeter.copy()
     old_hull = range(len(perimeter))
 
+    if len(perimeter) < 4:
+        return old_hull
+
     while 1:
         hull = _reduce_perimeter(new_perimeter)
         new_perimeter = perimeter[hull].copy()
@@ -158,6 +161,8 @@ def _perimeter2hull(perimeter):
         hull = [old_hull[i] for i in hull]
 
         if len(hull) == len(old_hull):
+            break
+        elif len(hull) <= 3:
             break
 
         old_hull = hull
@@ -167,7 +172,10 @@ def _perimeter2hull(perimeter):
 
 def convex_hull(points, adjacency):
     perimeter = traverse_perimeter(points, adjacency)
+    #import matplotlib.pyplot as plt
+    #plt.plot(*points[perimeter].T)
+    #plt.show()
 
     hull = _perimeter2hull(points[perimeter])
-
+    #print(perimeter, hull)
     return [perimeter[i] for i in hull]

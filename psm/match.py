@@ -173,9 +173,7 @@ class FaceMatcher(Matcher):
 
 
 def SubgraphMatcher(Matcher):
-
     def __init__(self, segments=None):
-
         super(RootedMatcher, self).__init__(segments)
 
     @property
@@ -189,8 +187,6 @@ def SubgraphMatcher(Matcher):
     def _match_generator(self, segments, progress_bar):
         A, B = self.segments, segments
         N, M = len(A), len(B)
-
-
 
 
 class RootedMatcher(Matcher):
@@ -433,15 +429,19 @@ class RMSD(object):
 
         precalced = self._do_precalc(A, B)
 
-        matcher = RootedMatcher(A)
+        matcher = FaceMatcher(A)
+        #matcher = RootedMatcher(A)
+
 
         for i, j, permutations in matcher.match(B, progress_bar=progress_bar):
 
             if permutations is not None:
+                assert len(A[i]) == len(B[j])
+
                 rmsds = np.zeros(len(permutations))
 
-                #print(permutations)
-                #sss
+                # print(permutations)
+                # sss
 
                 for k, permutation in enumerate(permutations):
                     rmsds[k] = self.get_rmsd(A[i], B[j], precalced, permutation)
@@ -523,23 +523,25 @@ class RMSD(object):
         for i, structure in enumerate(structures):
 
             if rmsd[i] <= rmsd_max:
+                try:
+                    permutation = self._permutations[frozenset((matches[i], i))]
 
-                permutation = self._permutations[frozenset((matches[i], i))]
+                    q = structure.points
+                    p = other[matches[i]].points
 
-                q = structure.points
-                p = other[matches[i]].points
+                    if axis:
+                        p = p[permutation]
+                    else:
+                        q = q[permutation]
 
-                if axis:
-                    p = p[permutation]
-                else:
-                    q = q[permutation]
+                    A = _affine_transform(p, q)
 
-                A = _affine_transform(p, q)
+                    U, P = scipy.linalg.polar(A[:-1, :-1], side='left')
 
-                U, P = scipy.linalg.polar(A[:-1, :-1], side='left')
+                    rotation[i] = np.arctan2(U[0, 1], U[0, 0])  # % (2 * np.pi / self._symmetries[key])
 
-                rotation[i] = np.arctan2(U[0, 1], U[0, 0])  # % (2 * np.pi / self._symmetries[key])
-
-                strain[i] = P - np.identity(2)
+                    strain[i] = P - np.identity(2)
+                except:
+                    pass
 
         return strain, rotation

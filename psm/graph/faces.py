@@ -57,7 +57,7 @@ def find_outer_face(points, adjacency, faces):
     raise RuntimeError('Outer face not found.')
 
 
-def find_faces(points, adjacency, remove_outer_face=True):
+def find_faces(points, adjacency, remove_outer_face=True, remove_hull=False):
     """Return the faces of a plane graph."""
 
     clockwise = find_clockwise(points, adjacency)
@@ -80,9 +80,24 @@ def find_faces(points, adjacency, remove_outer_face=True):
             else:
                 break
 
-    if remove_outer_face:
+    if remove_outer_face | remove_hull:
         outer_face = find_outer_face(points, adjacency, faces)
-        del faces[outer_face]
+        # del faces[outer_face]
+
+        if remove_hull:
+            adjacent_faces = face_adjacency(faces)[outer_face]
+            adjacent_faces.add(outer_face)
+            faces = [face for i, face in enumerate(faces) if i not in adjacent_faces]
+
+            # edges_new = []
+            # for edge in edges:
+            #    if not ((edge[0] in outer_face) & (edge[1] in outer_face)):
+            #        edges_new.append(edge)
+
+            # adjacency = edges2adjacency(edges_new, len(segments.points))
+
+            # faces = find_faces()
+            # edges = adjacency2edges()
 
     return faces
 
@@ -172,10 +187,5 @@ def _perimeter2hull(perimeter):
 
 def convex_hull(points, adjacency):
     perimeter = traverse_perimeter(points, adjacency)
-    #import matplotlib.pyplot as plt
-    #plt.plot(*points[perimeter].T)
-    #plt.show()
-
     hull = _perimeter2hull(points[perimeter])
-    #print(perimeter, hull)
     return [perimeter[i] for i in hull]

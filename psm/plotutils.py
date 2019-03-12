@@ -154,25 +154,6 @@ def voronoi_polygons(segments):
     return polygons
 
 
-def add_labeled_patches(polygons, labels, ax, cmap, descriptions=None, legend=True, **kwargs):
-    if descriptions is None:
-        descriptions = {label: label for label in labels}
-
-    proxies = []
-    patches = []
-    for label, color in zip(np.unique(labels), cmap):
-        label_polygons = [polygon for polygon, has_label in zip(polygons, label == labels) if has_label]
-
-        patches.append(add_patches(label_polygons, c=color, ax=ax, **kwargs))
-
-        proxies.append(matplotlib.patches.Patch(color=color, label=descriptions[label]))
-
-    if legend:
-        ax.legend(handles=proxies)
-
-    return patches
-
-
 def _get_colors_array(ax, c, n=None, vmin=None, vmax=None, cmap=None):
     if c is None:
         c = ax._get_patches_for_fill.get_next_color()
@@ -219,6 +200,25 @@ def add_patches(polygons, ax, c=None, vmin=None, vmax=None, cmap=None, **kwargs)
     ax.add_collection(p)
 
     return p
+
+
+def add_labeled_patches(polygons, labels, ax, cmap, descriptions=None, legend=True, **kwargs):
+    if descriptions is None:
+        descriptions = {label: label for label in labels}
+
+    proxies = []
+    patches = []
+    for label, color in zip(np.unique(labels), cmap):
+        label_polygons = [polygon for polygon, has_label in zip(polygons, label == labels) if has_label]
+
+        patches.append(add_patches(label_polygons, c=color, ax=ax, **kwargs))
+
+        proxies.append(matplotlib.patches.Patch(color=color, label=descriptions[label]))
+
+    if legend:
+        ax.legend(handles=proxies)
+
+    return patches
 
 
 def add_edges(points, edges, c, color_mode='edges', cmap=None, ax=None, n=2, vmin=None, vmax=None, **kwargs):

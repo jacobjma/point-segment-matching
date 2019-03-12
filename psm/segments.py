@@ -311,8 +311,9 @@ class Segments(object):
 
         return faces[find_outer_face(self.points, self.adjacency, faces)]
 
-    def faces(self, set_indices=True, remove_outer_face=True):
-        faces = find_faces(self.points, self.adjacency, remove_outer_face)
+    def faces(self, set_indices=True, remove_outer_face=True, remove_hull=False):
+
+        faces = find_faces(self.points, self.adjacency, remove_outer_face, remove_hull)
 
         if set_indices:
             self._indices = faces
@@ -340,6 +341,8 @@ class Segments(object):
     def register(self, other, rmsd_calc=None, progress_bar=True, **kwargs):
         if rmsd_calc is None:
             self._rmsd_calc = RMSD(**kwargs)
+        else:
+            self._rmsd_calc = rmsd_calc
 
         return self._rmsd_calc.register(other, self, progress_bar=progress_bar)
 

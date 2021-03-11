@@ -2,12 +2,17 @@ import itertools
 
 import numpy as np
 
-from psm.segments_ import Segments
+from psm.graph.geometric import urquhart
 from psm.graph.graphutils import find_clockwise
-from psm.graph.traversal_slow import clockwise_traversal_with_depth
+try:
+    from psm.graph.traversal import clockwise_traversal_with_depth
+except:
+    from psm.graph.traversal_slow import clockwise_traversal_with_depth
+from psm.register import MatchGraph
+from psm.structures import Structures
 
 
-def build_lattice_points(a, b, max_index, basis=None, labels=None):
+def build_lattice_points(a, b, max_index, basis=None):
     # TODO: Docstring
     a = np.array(a)
     b = np.array(b)
@@ -25,12 +30,7 @@ def build_lattice_points(a, b, max_index, basis=None, labels=None):
 
     points = points[:, :, None, :] + basis[None, None, :, :]
 
-    n_points = np.prod(points.shape[:3])
-
-    if labels is not None:
-        labels = np.tile(labels, n_points // len(labels))
-
-    return points.reshape((n_points, 2)), labels
+    return points.reshape((np.prod(points.shape[:3]), 2))
 
 
 def build_lattice_dict(max_index, basis_size):
@@ -44,71 +44,75 @@ def build_lattice_dict(max_index, basis_size):
     return indices
 
 
-def lattice(a, b, max_index, basis=None, labels=None):
+def lattice_traversal(a, b, basis=None, radius=None, max_depth=None, max_structures=np.inf, graph_func=None,
+                      rmsd_calc=None, tol=1e-6):
     # TODO: Docstring
 
-    points, labels = build_lattice_points(a, b, max_index, basis, labels)
-
-    return Segments(points, labels=labels)
-
-
-def lattice_segment(a, b, max_depth, min_alpha=0, basis=None, max_index=None, labels=None):
-    # TODO: Docstring
     if basis is None:
         basis = np.array([[0., 0.]])
     else:
         basis = np.array(basis, dtype=float)
 
-    if max_index is None:
-        max_index = 11
+    if graph_func is None:
+        graph_func = urquhart
 
-    segments = lattice(a=a, b=b, max_index=max_index, basis=basis, labels=labels)
+    if rmsd_calc is None:
+        rmsd_calc = MatchGraph(transform='rigid', pivot='front')
 
-    segments.build_graph(min_alpha)
+    max_index = 11
 
-    root = build_lattice_dict(max_index, len(basis))[(0, 0)][0]
-    edge = (root, next(iter(segments.adjacency[root])))
+    points = build_lattice_points(a, b, max_index, basis)
 
-    clockwise = find_clockwise(segments.points, segments.adjacency)
+    lattice_dict = build_lattice_dict(max_index, len(basis))
 
-    traversal, _ = clockwise_traversal_with_depth(edge, segments.adjacency, clockwise, max_depth)
+    adjacency = graph_func(points)
 
-    segments._indices = [traversal]
+    clockwise = find_clockwise(points, adjacency)
 
-    return segments
+    root = lattice_dict[(0, 0)][0]
 
+    traversals = []
+    for i, j in enumerate(adjacency[root]):
+        edge = (root, j)
 
-def regular_polygon_points(sidelength, n):
-    points = np.zeros((n, 2))
+        traversal, _ = clockwise_traversal_with_depth(edge, adjacency, clockwise, max_depth)
 
-    L = sidelength / (2 * np.sin(np.pi / n))
+        if radius is not None:
+            order = {i: j for i, j in enumerate(traversal)}
+            keep = np.where(np.linalg.norm(points[traversal] - points[root], axis=1) <= radius)[0]
+            traversal = [order[i] for i in keep]
 
-    points[:, 0] = np.cos(np.arange(n) * 2 * np.pi / n) * L
-    points[:, 1] = np.sin(np.arange(n) * 2 * np.pi / n) * L
+        traversals.append(traversal)
 
-    return points
+        if i > max_structures - 1:
+            break
 
+    structures = Structures(points, traversals, adjacency)
 
-def regular_polygon(sidelength, n, include_center=False):
-    points = regular_polygon_points(sidelength, n)
-    adjacency = [set(((j - 1) % n, (j + 1) % n)) for j in range(n)]
-    segments = [range(n)]
+    if len(traversals) > 1:
+        rmsd_calc.register(structures, structures, progress_bar=False)
 
-    if include_center is True:
-        points = np.vstack(([[0, 0]], points))
-        adjacency = [set(range(1, n + 1))] + [set((((j - 1) % n) + 1, ((j + 1) % n) + 1)) for j in range(n)]
-        for adjacent in adjacency[1:]:
-            adjacent.add(0)
-        segments = [range(n + 1)]
-
-    return Segments(points, segments, adjacency)
+        return rmsd_calc.principal_structures(len(adjacency[0]), tol)
+    else:
+        return structures
 
 
-def regular_polygons(sidelength, n_sides):
+def regular_polygons(sidelength, sides):
     # TODO: Docstring
+    points = np.zeros((np.sum(sides), 2))
+    segments = []
+    adjacency = []
 
-    segments = Segments()
-    for n in n_sides:
-        segments.extend(regular_polygon(sidelength, n))
+    i = 0
+    for n in sides:
+        L = sidelength / (2 * np.sin(np.pi / n))
 
-    return segments
+        points[i:i + n, 0] = np.cos(np.arange(n) * 2 * np.pi / n) * L
+        points[i:i + n, 1] = np.sin(np.arange(n) * 2 * np.pi / n) * L
+
+        segments.append(range(i, i + n))
+        adjacency += [set((i + (j - 1) % n, i + (j + 1) % n)) for j in range(n)]
+
+        i += n
+
+    return Structures(points, segments, adjacency)

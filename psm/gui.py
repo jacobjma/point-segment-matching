@@ -1,120 +1,139 @@
-from collections import OrderedDict
-
 import numpy as np
-import bqplot
-from bqplot.interacts import BrushSelector, PanZoom
-import ipywidgets as widgets
-from traitlets import link
-import PIL
-import io
+from scipy.spatial.distance import cdist
 
 
-def axis2name(axis):
-    if axis is 0:
-        return 'x'
-    elif axis is 1:
-        return 'y'
+class PointsEditor(object):
+    title = ("Click and drag a marker to move it; "
+             "'a' to add; 'd' to delete; 'v' set visibility.\n"
+             "Close figure when done.")
 
+    def __init__(self, ax, points=None, max_distance=30):
 
-def array2widget(array):
-    array = (array - array.min()) / (array.max() - array.min()) * 255
+        self._ax = ax
 
-    pil_image = PIL.Image.fromarray(array).convert('RGB')
-    byte_arr = io.BytesIO()
-    pil_image.save(byte_arr, format='png')
-    return widgets.Image(value=byte_arr.getvalue(), format='png')
-
-
-class Element(object):
-
-    def __init__(self, figure, scatter):
-        self._scatter = scatter
-        self._figure = figure
-
-    figure = property(lambda self: self._figure)
-    scatter = property(lambda self: self._scatter)
-    axes = property(lambda self: self.figure.axes)
-    scales = property(lambda self: [self.axes[0].scale, self.axes[1].scale])
-
-
-class Navigator(Element):
-
-    def __init__(self, figure, scatter, default_region):
-        super().__init__(figure, scatter)
-        self._default_region = np.array(default_region).astype(np.float)
-
-        pan_zoom = PanZoom(scales={'x': [self.scales[0]], 'y': [self.scales[1]]})
-        brush = BrushSelector(x_scale=self.scales[0], y_scale=self.scales[1], marks=[scatter])
-        toggle_interact = widgets.ToggleButtons(options=OrderedDict([('Pan & Zoom', pan_zoom),
-                                                                     ('Select region', brush)]))
-        link((toggle_interact, 'value'), (self.figure, 'interaction'))
-
-        set_region_button = widgets.Button(description='Set region', disabled=False, button_style='')
-
-        def on_button_clicked(_):
-            if brush.selected is not None:
-                self.set_region(brush.selected)
-                brush.selected = None
-
-        set_region_button.on_click(on_button_clicked)
-
-        reset_region_button = widgets.Button(description='Reset region', disabled=False, button_style='')
-        reset_region_button.on_click(lambda _: self.set_region())
-
-        button_box = widgets.HBox([toggle_interact, set_region_button, reset_region_button])
-        region_box = widgets.HBox([self._build_region_input(0, 'min'), self._build_region_input(0, 'max'),
-                                   self._build_region_input(1, 'min'), self._build_region_input(1, 'max')])
-
-        self._accordion = widgets.Accordion(children=[widgets.VBox([button_box, region_box])])
-        self._accordion.set_title(0, 'Navigation')
-
-    def set_region(self, limits=None):
-        if limits is None:
-            limits = self._default_region
-
-        self.scales[0].min = limits[0, 0]
-        self.scales[0].max = limits[1, 0]
-        self.scales[1].min = limits[0, 1]
-        self.scales[1].max = limits[1, 1]
-
-    def _build_region_input(self, axis, min_or_max):
-        style = {'description_width': 'initial'}
-
-        if min_or_max is 'min':
-            default = self._default_region[0][axis]
-        elif min_or_max is 'max':
-            default = self._default_region[1][axis]
+        if points is None:
+            self._points = np.zeros((0, 2))
         else:
-            raise RuntimeError()
+            self._points = points
 
-        float_text = widgets.FloatText(value=default, description='{} {}:'.format(axis2name(axis), min_or_max),
-                                       disabled=False,
-                                       style=style)
-        link((float_text, 'value'), (self.scales[axis], min_or_max))
-        return float_text
+        self.max_distance = max_distance
 
+        self.visible = True
 
-class PointEditor(Element):
+    @property
+    def points(self):
+        return self._points
 
-    def __init__(self, x, y, background):
-        x_scale = bqplot.LinearScale()
-        y_scale = bqplot.LinearScale()
+    def edit(self, close_callback=None, **kwargs):
 
-        x_axis = bqplot.Axis(scale=x_scale)
-        y_axis = bqplot.Axis(scale=y_scale, orientation='vertical')
+        self._ind = None
+        self.create_artists(self._ax, **kwargs)
 
-        scatter = bqplot.ScatterGL(x=x, y=y, scales={'x': x_scale, 'y': y_scale})
-        ipyimage = widgets.Image(image=array2widget(background))
-        image = bqplot.Image(image=ipyimage, scales={'x': x_scale, 'y': y_scale})
+        canvas = self._line.figure.canvas
+        canvas.mpl_connect('draw_event', self.draw_callback)
+        canvas.mpl_connect('button_press_event', self.button_press_callback)
+        canvas.mpl_connect('button_release_event', self.button_release_callback)
+        canvas.mpl_connect('key_press_event', self.key_press_callback)
+        canvas.mpl_connect('motion_notify_event', self.motion_notify_callback)
 
-        figure = bqplot.Figure(axes=[x_axis, y_axis], marks=[image])
+        if close_callback is not None:
+            self.close_callback_fun = close_callback
+            canvas.mpl_connect('close_event', self.close_callback)
 
-        super().__init__(figure, scatter)
+        self.canvas = canvas
 
-        default_region = np.array([[x.min(), y.min()], [x.max(), y.max()]])
+    def close_callback(self, event):
+        self.close_callback_fun(self._points)
 
-        self._navigator = Navigator(figure, scatter, default_region)
+    def create_artists(self, ax, **kwargs):
+        x, y = self._points.T
 
-    def display(self):
-        return self.figure
-    #    return widgets.VBox([self.figure, self._navigator._accordion])
+        self._line = ax.scatter(x, y, animated=True, **kwargs)
+
+        ax.set_clip_on(False)
+        ax.set_title(self.title)
+
+    def draw_artists(self):
+        self._ax.draw_artist(self._line)
+
+    def update_artists(self):
+        self.canvas.restore_region(self._background)
+        self._line.set_offsets(self._points)
+        self.draw_artists()
+        self.canvas.update()
+        self.canvas.flush_events()
+
+    def set_visible(self):
+        self.visible = not self.visible
+        self._line.set_visible(self.visible)
+        if not self.visible:
+            self._ind = None
+
+    def draw_callback(self, event):
+        self._background = self.canvas.copy_from_bbox(self._ax.bbox)
+        self.draw_artists()
+        self.canvas.update()
+
+    def button_press_callback(self, event):
+        ignore = (not self.visible or event.inaxes is None or event.button != 1 or
+                  len(self._points) == 0)
+        if ignore:
+            return
+        self._ind = self.get_ind_under_cursor(event)
+
+    def button_release_callback(self, event):
+        ignore = not self.visible or event.button != 1
+        if ignore:
+            return
+        self._ind = None
+
+    def key_press_callback(self, event):
+        if not event.inaxes:
+            return
+        if event.key == 'v':
+            self.set_visible()
+        elif event.key == 'd':
+            self.delete_marker(event)
+        elif event.key == 'a':
+            self.add_marker(event)
+
+        self.canvas.update()
+
+    def motion_notify_callback(self, event):
+        ignore = (not self.visible or event.inaxes is None or
+                  event.button != 1 or self._ind is None or
+                  len(self._points) == 0)
+
+        if ignore:
+            return
+        x, y = event.xdata, event.ydata
+
+        self._points[self._ind][0] = x
+        self._points[self._ind][1] = y
+
+        self.update_artists()
+
+    def delete_marker(self, event):
+        if len(self._points) == 0:
+            return
+        ind = self.get_ind_under_cursor(event)
+        if ind is None:
+            return
+        self._points = np.delete(self._points, ind, axis=0)
+
+        self.update_artists()
+
+    def add_marker(self, event):
+        x, y = event.xdata, event.ydata
+        self._points = np.vstack((self._points, np.array([[x, y]])))
+        self.update_artists()
+
+    def get_ind_under_cursor(self, event):
+
+        dist = cdist([[event.xdata, event.ydata]], self._points)
+        closest_ind = np.argmin(dist)
+
+        if dist[0][closest_ind] >= self.max_distance:
+            closest_ind = None
+
+        return closest_ind

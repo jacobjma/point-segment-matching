@@ -39,7 +39,7 @@ class Segments(object):
     """
 
     def __init__(self, points=None, adjacency=None, indices=None, labels=None):
-
+        
         if points is None:
             self._points = np.zeros((0, 2))
         else:

@@ -1,15 +1,16 @@
 from copy import copy
 
 import numpy as np
+from scipy.ndimage import gaussian_laplace
 from scipy.ndimage.filters import maximum_filter, minimum_filter
 from scipy.ndimage.measurements import center_of_mass, label
-from scipy.ndimage import gaussian_laplace
 
-from psm.utils import bar
 from psm.image.fitting import Polynomial2D
+from psm.utils import bar
+
 
 def find_local_peaks(image, min_distance, threshold=0, local_threshold=0,
-                     exclude_border=0, exclude_adjacent=False):
+                     exclude_border=0, exclude_adjacent=False, return_markers=False):
     """Return peaks in an image.
     
     Peaks are the local maxima in a region of `2 * min_distance + 1`
@@ -67,6 +68,9 @@ def find_local_peaks(image, min_distance, threshold=0, local_threshold=0,
         is_peak[-1:-exclude_border - 1:-1, :] = False
         is_peak[:, -1:-exclude_border - 1:-1] = False
 
+    if return_markers:
+        return is_peak
+
     if exclude_adjacent:
         labels = label(is_peak)
         peaks = center_of_mass(np.ones_like(labels[0]), labels[0], range(1, labels[1] + 1))
@@ -83,7 +87,7 @@ def _disk(radius, dtype=np.uint8):
     return np.array((X ** 2 + Y ** 2) <= radius ** 2, dtype=dtype)
 
 
-def refine_peaks(image, points, model, extent=3, region_shape='disk', progress_bar=False):
+def refine_peaks(image, points, model=None, extent=3, region_shape='disk', progress_bar=False):
     """Refine the position intensity extrema to sub-pixel accuracy.
 
     The positions of intensity extrema are refined by fitting a model function
@@ -113,6 +117,9 @@ def refine_peaks(image, points, model, extent=3, region_shape='disk', progress_b
     else:
         raise ValueError()
 
+    if model is None:
+        model = Polynomial2D()
+
     r = (np.array(region.shape) - 1) // 2
 
     region = np.array(region).astype(bool)
@@ -131,6 +138,10 @@ def refine_peaks(image, points, model, extent=3, region_shape='disk', progress_b
     v = v[region] - r[1]
 
     for i, p in enumerate(bar(points, units='fits', disable=not progress_bar)):
+
+        if (p[0] < r[0]) | (p[0] > (X.shape[0] - r[0])) | (p[1] < r[1]) | (p[1] > X.shape[1] - r[1]):
+            raise RuntimeError('cannot refine peaks close to border')
+
         x = X[p[0] - r[0]:p[0] + r[0] + 1, p[1] - r[1]:p[1] + r[1] + 1]
         y = Y[p[0] - r[0]:p[0] + r[0] + 1, p[1] - r[1]:p[1] + r[1] + 1]
 

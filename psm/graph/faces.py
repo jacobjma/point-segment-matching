@@ -38,20 +38,27 @@ def connected_faces(faces):
 def find_outer_face(points, adjacency, faces):
     """Return the index of the outer face from a list of faces."""
 
-    leftmost = np.where(points[:, 0] == np.min(points[:, 0]))[0]
+    degrees = np.array([len(adjacent) for adjacent in adjacency])
+
+    leftmost = np.where((points[:, 0] == np.min(points[(degrees > 0), 0])))[0]
+
+    #print()
+
     leftmost = leftmost[np.argmin(points[leftmost, 1])]
 
     adjacent = list(adjacency[leftmost])
 
     angles = np.arctan2(points[adjacent][:, 1] - points[leftmost, 1],
-                        points[adjacent][:, 0] - points[leftmost, 0])
+                        points[adjacent][:, 0] - points[leftmost, 0] + 1)
 
     other = adjacent[np.argmax((angles - np.pi / 2) % (2 * np.pi))]
 
     pair = '|' + str(leftmost) + '|' + str(other) + '|'
-
+    # print(pair)
     for i, face in enumerate(faces):
+        # print(face)
         if pair in ('|' + '|'.join(map(str, face + [face[0]])) + '|'):
+            # print(i)
             return i
 
     raise RuntimeError('Outer face not found.')
@@ -82,7 +89,9 @@ def find_faces(points, adjacency, remove_outer_face=True, remove_hull=False):
 
     if remove_outer_face | remove_hull:
         outer_face = find_outer_face(points, adjacency, faces)
-        # del faces[outer_face]
+
+        if not remove_hull:
+            del faces[outer_face]
 
         if remove_hull:
             adjacent_faces = face_adjacency(faces)[outer_face]

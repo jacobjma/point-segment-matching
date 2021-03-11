@@ -6,7 +6,7 @@ from psm.build import build_lattice_points, lattice_traversal
 from psm.graph.geometric import urquhart
 from psm.match import RMSD
 from psm.plotutils import add_colorbar
-from psm.segments import traverse_from_all
+from psm.segments_ import traverse_from_all
 
 
 def continuum_strain(points, W, A):

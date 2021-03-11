@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 from sklearn.cluster import DBSCAN
 
-import psm.segments
+import psm.segments_
 from psm.match import RMSD
 from psm.graph.graphutils import subgraph
 
@@ -81,7 +81,7 @@ class Cluster(object):
 
         unique = np.unique(self._labels[self._labels != -1])
 
-        segments = psm.segments.Segments()
+        segments = psm.segments_.Segments()
         for label in unique[:n]:
 
             cluster = np.where(label == self._labels)[0]
@@ -104,6 +104,6 @@ class Cluster(object):
                     break
 
             adjacency = subgraph(self._structures[cluster[-1]].adjacency, list(permutation))
-            segments.extend(psm.segments.Segments(rotated, [range(len(permutation))], adjacency))
+            segments.extend(psm.segments_.Segments(rotated, [range(len(permutation))], adjacency))
 
         return segments

@@ -6,7 +6,7 @@ from scipy.optimize import least_squares
 from psm.cluster import Cluster
 from psm.graph.faces import connected_faces
 from psm.match import FaceMatcher, RMSD
-from psm.segments import Segments, select_segments
+from psm.segments_ import Segments, select_segments
 
 
 def assign_miller(faces, vectors, seed=0):
@@ -48,13 +48,17 @@ def assign_miller(faces, vectors, seed=0):
                     queue.append((face[i], face[i - 1]))
 
                     if face[i] not in miller.keys():
+
+
                         vector = (miller[face[i - 1]][0] - miller[face[i - 2]][0],
                                   miller[face[i - 1]][1] - miller[face[i - 2]][1])
+
 
                         vector = next_vector[vector]
 
                         miller[face[i]] = (miller[face[i - 1]][0] + vector[0],
-                                           miller[face[i - 1]][1] + vector[1])
+                                       miller[face[i - 1]][1] + vector[1])
+
 
     return miller
 

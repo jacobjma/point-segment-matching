@@ -154,7 +154,7 @@ def voronoi_polygons(segments):
     return polygons
 
 
-def _get_colors_array(ax, c, n=None, vmin=None, vmax=None, cmap=None):
+def get_colors_array(c, ax=None, n=None, vmin=None, vmax=None, cmap=None):
     if c is None:
         c = ax._get_patches_for_fill.get_next_color()
 
@@ -189,7 +189,7 @@ def _get_colors_array(ax, c, n=None, vmin=None, vmax=None, cmap=None):
 
 
 def add_patches(polygons, ax, c=None, vmin=None, vmax=None, cmap=None, **kwargs):
-    colors = _get_colors_array(ax, c, len(polygons), vmin=vmin, vmax=vmax, cmap=cmap)
+    colors = get_colors_array(c, ax, len(polygons), vmin=vmin, vmax=vmax, cmap=cmap)
 
     patches = []
     for polygon in polygons:
@@ -265,7 +265,7 @@ def add_edges(points, edges, c, color_mode='edges', cmap=None, ax=None, n=2, vmi
             lines[i * n:i * n + n] = np.concatenate([line[:-1], line[1:]], axis=1)
 
     elif color_mode is 'edges':
-        colors = _get_colors_array(ax, c, len(edges))
+        colors = get_colors_array(c, ax, len(edges))
 
         lines = np.zeros((len(edges), 2, 2))
         for i, edge in enumerate(edges):
@@ -320,24 +320,32 @@ def voronoi_plot(segments, ax=None, labels=None, c=None, vmin=None, vmax=None, *
     return ax, p
 
 
-def edge_plot(segments, ax=None, labels=None, c=None, vmin=None, vmax=None, **kwargs):
+def edge_plot(segments, ax=None, c=None, vmin=None, vmax=None, **kwargs):
     if ax is None:
         fig, ax = plt.subplots()
 
-    if labels is not None:
+    edges = segments.edges
+    if isinstance(c, dict):
+        c = [c[frozenset(edge)] for edge in edges]
 
-        p = add_labeled_patches(polygons, labels, ax=ax, **kwargs)
-    else:
-        edges = segments.edges
-        if isinstance(c, dict):
-            c = [c[frozenset(edge)] for edge in edges]
-
-        lc, ax = add_edges(segments.points, edges, ax=ax, c=c, vmin=vmin, vmax=vmax, **kwargs)
+    lc, ax = add_edges(segments.points, edges, ax=ax, c=c, vmin=vmin, vmax=vmax, **kwargs)
 
     ax.axis('equal')
     ax.autoscale()
 
     return ax, lc
+
+
+def scatter_plot(points, ax=None, c=None, vmin=None, vmax=None, **kwargs):
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    ax.scatter(*points.T, c=c)
+
+    ax.axis('equal')
+    ax.autoscale()
+
+    return ax
 
 
 def show_segment(segment, ax=None, c='k', show_order=False):
@@ -377,10 +385,12 @@ def show_segments(segments, axes=None, nrows=1, n=None, c='k', show_order=False)
 
         edge_plot(segment, ax, c=c)
 
+        ax.scatter(*segment.points.T, zorder=2, c=segment.labels, cmap='Paired')
+
         if show_order:
             for i, point in enumerate(segment.points):
                 ax.annotate('{}'.format(i), xy=point)
 
-        ax.axis('equal')
+        # ax.axis('equal')
 
     return axes

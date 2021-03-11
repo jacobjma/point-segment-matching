@@ -6,7 +6,7 @@ from psm.build import lattice_traversal
 from psm.geometry import transform
 from psm.graph import urquhart
 from psm.register import RMSD
-from psm.segments import traverse_from_all
+from psm.segments_ import traverse_from_all
 
 points = np.load('data/poly_graphene.npy')
 

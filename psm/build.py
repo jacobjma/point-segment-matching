@@ -2,12 +2,12 @@ import itertools
 
 import numpy as np
 
-from psm.segments import Segments
+from psm.segments_ import Segments
 from psm.graph.graphutils import find_clockwise
 from psm.graph.traversal_slow import clockwise_traversal_with_depth
 
 
-def build_lattice_points(a, b, max_index, basis=None):
+def build_lattice_points(a, b, max_index, basis=None, labels=None):
     # TODO: Docstring
     a = np.array(a)
     b = np.array(b)
@@ -25,7 +25,12 @@ def build_lattice_points(a, b, max_index, basis=None):
 
     points = points[:, :, None, :] + basis[None, None, :, :]
 
-    return points.reshape((np.prod(points.shape[:3]), 2))
+    n_points = np.prod(points.shape[:3])
+
+    if labels is not None:
+        labels = np.tile(labels, n_points // len(labels))
+
+    return points.reshape((n_points, 2)), labels
 
 
 def build_lattice_dict(max_index, basis_size):
@@ -39,12 +44,15 @@ def build_lattice_dict(max_index, basis_size):
     return indices
 
 
-def lattice(a, b, max_index, basis=None):
+def lattice(a, b, max_index, basis=None, labels=None):
     # TODO: Docstring
-    return Segments(build_lattice_points(a, b, max_index, basis))
+
+    points, labels = build_lattice_points(a, b, max_index, basis, labels)
+
+    return Segments(points, labels=labels)
 
 
-def lattice_segment(a, b, max_depth, min_alpha=0, basis=None, max_index=None):
+def lattice_segment(a, b, max_depth, min_alpha=0, basis=None, max_index=None, labels=None):
     # TODO: Docstring
     if basis is None:
         basis = np.array([[0., 0.]])
@@ -54,7 +62,7 @@ def lattice_segment(a, b, max_depth, min_alpha=0, basis=None, max_index=None):
     if max_index is None:
         max_index = 11
 
-    segments = lattice(a=a, b=b, max_index=max_index, basis=basis)
+    segments = lattice(a=a, b=b, max_index=max_index, basis=basis, labels=labels)
 
     segments.build_graph(min_alpha)
 
@@ -88,7 +96,7 @@ def regular_polygon(sidelength, n, include_center=False):
 
     if include_center is True:
         points = np.vstack(([[0, 0]], points))
-        adjacency = [set(range(1, n + 1))] + [set((((j - 1) % n)+1, ((j + 1) % n)+1)) for j in range(n)]
+        adjacency = [set(range(1, n + 1))] + [set((((j - 1) % n) + 1, ((j + 1) % n) + 1)) for j in range(n)]
         for adjacent in adjacency[1:]:
             adjacent.add(0)
         segments = [range(n + 1)]

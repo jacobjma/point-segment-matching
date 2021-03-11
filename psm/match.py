@@ -106,7 +106,13 @@ class Matcher(object):
     def segments(self, segments):
         self._segments = segments
 
-    def match(self, segments, progress_bar=True):
+    def _self_match_generator(self, progress_bar=False):
+        raise NotImplementedError
+
+    def _match_generator(self, segments, progress_bar=False):
+        raise NotImplementedError
+
+    def match(self, segments, progress_bar=False):
 
         if self.segments is None:
             raise RuntimeError()
@@ -132,7 +138,7 @@ class FaceMatcher(Matcher):
     def segments(self, segments):
         self._segments = segments
 
-    def _self_match_generator(self, progress_bar):
+    def _self_match_generator(self, progress_bar=False):
         A, B = self.segments, self.segments
 
         N = len(A)
@@ -153,14 +159,16 @@ class FaceMatcher(Matcher):
                 else:
                     yield i, j, permutations
 
-    def _match_generator(self, segments, progress_bar):
+    def _match_generator(self, segments, progress_bar=False):
         A, B = self.segments, segments
         N, M = len(A), len(B)
+
+        # TODO : Check symmetries
 
         bar = ProgressBar(N * M, units='registrations', disable=not progress_bar)
         for i, a in enumerate(A):
             linspace = np.linspace(0, len(a) - 1, len(a), dtype=int)
-            permutations = [np.roll(linspace, i) for i in range(len(a))]
+            permutations = np.array([np.roll(linspace, i) for i in range(len(a))])
 
             for j, b in enumerate(B):
                 bar.print(i * M + j)
@@ -169,24 +177,40 @@ class FaceMatcher(Matcher):
                     yield i, j, None
 
                 else:
-                    yield i, j, permutations
+
+                    if a.labels is not None:
+                        if b.labels is None:
+                            raise RuntimeError()
+
+                        labels = a.labels[:, None][permutations[None, :]][0, ..., 0]
+
+                        matching_labels = np.all(labels == b.labels[None], axis=1)
+
+                        if not np.any(matching_labels):
+                            yield i, j, None
+
+                        else:
+                            yield i, j, permutations[matching_labels]
+                    else:
+
+                        yield i, j, permutations
 
 
-def SubgraphMatcher(Matcher):
-    def __init__(self, segments=None):
-        super(RootedMatcher, self).__init__(segments)
-
-    @property
-    def segments(self):
-        return self._segments
-
-    @segments.setter
-    def segments(self, segments):
-        self._segments = order_segments(segments)
-
-    def _match_generator(self, segments, progress_bar):
-        A, B = self.segments, segments
-        N, M = len(A), len(B)
+# def SubgraphMatcher(Matcher):
+#     def __init__(self, segments=None):
+#         super(RootedMatcher, self).__init__(segments)
+#
+#     @property
+#     def segments(self):
+#         return self._segments
+#
+#     @segments.setter
+#     def segments(self, segments):
+#         self._segments = order_segments(segments)
+#
+#     def _match_generator(self, segments, progress_bar):
+#         A, B = self.segments, segments
+#         N, M = len(A), len(B)
 
 
 class RootedMatcher(Matcher):
@@ -204,26 +228,7 @@ class RootedMatcher(Matcher):
         self._segments = order_segments(segments)
         self._permutations, self._graph_hashes, self._hash_labels = find_alternate_orders(segments)
 
-    def _match_generator(self, segments, progress_bar):
-        A, B = self.segments, segments
-        N, M = len(A), len(B)
-        B = order_segments(B)
-
-        bar = ProgressBar(N * M, units='registrations', disable=not progress_bar)
-        for i, a in enumerate(A):
-
-            permutations = self._permutations[self._graph_hashes[i]]
-
-            for j, b in enumerate(B):
-                bar.print(i * M + j)
-
-                if len(a) != len(b):
-                    yield i, j, None
-
-                else:
-                    yield i, j, permutations
-
-    def _self_match_generator(self, progress_bar):
+    def _self_match_generator(self, progress_bar=False):
 
         A, B = self.segments, self.segments
 
@@ -248,6 +253,40 @@ class RootedMatcher(Matcher):
 
                 else:
                     yield i, j, None
+
+    def _match_generator(self, segments, progress_bar=False):
+        A, B = self.segments, segments
+        N, M = len(A), len(B)
+        B = order_segments(B)
+
+        bar = ProgressBar(N * M, units='registrations', disable=not progress_bar)
+        for i, a in enumerate(A):
+
+            permutations = np.array(self._permutations[self._graph_hashes[i]])
+
+            for j, b in enumerate(B):
+                bar.print(i * M + j)
+
+                if len(a) != len(b):
+                    yield i, j, None
+
+                else:
+                    if a.labels is not None:
+                        if b.labels is None:
+                            raise RuntimeError()
+
+                        labels = a.labels[:, None][permutations[None, :]][0, ..., 0]
+
+                        matching_labels = np.all(labels == b.labels[None], axis=1)
+
+                        if not np.any(matching_labels):
+                            yield i, j, None
+
+                        else:
+                            yield i, j, permutations[matching_labels]
+
+                    else:
+                        yield i, j, permutations
 
 
 def _affine_transform(src, dst):
@@ -390,11 +429,6 @@ class RMSD(object):
         p = a.points[permutation] - precalced[a]['pivot']
         q = b.points - precalced[b]['pivot']
 
-        # import matplotlib.pyplot as plt
-        # plt.plot(p[:,0],p[:,1])
-        # plt.plot(q[:, 0], q[:, 1])
-        # plt.show()
-
         if (self.transform == 'rigid') & self.scale_invariant:
             scale = np.sqrt(precalced[a]['scale'] ** 2 + precalced[b]['scale'] ** 2)
             p = p / scale
@@ -410,11 +444,8 @@ class RMSD(object):
         return p, q
 
     def get_rmsd(self, a, b, precalced, permutation):
-
         p, q = self._get_points(a, b, precalced, permutation)
-
         rmsd = safe_rmsd(p, q)
-
         return rmsd
 
     def register(self, A, B, progress_bar=False):
@@ -425,23 +456,22 @@ class RMSD(object):
         self._rmsd = np.empty((N, M))
         self._rmsd[:] = np.nan
         self._permutations = {}
-        self._symmetries = {}
 
         precalced = self._do_precalc(A, B)
 
+        # if A.is_faces():
         matcher = FaceMatcher(A)
+        # else:
+        #
+        #
         #matcher = RootedMatcher(A)
-
 
         for i, j, permutations in matcher.match(B, progress_bar=progress_bar):
 
             if permutations is not None:
-                assert len(A[i]) == len(B[j])
+                # assert len(A[i]) == len(B[j])
 
                 rmsds = np.zeros(len(permutations))
-
-                # print(permutations)
-                # sss
 
                 for k, permutation in enumerate(permutations):
                     rmsds[k] = self.get_rmsd(A[i], B[j], precalced, permutation)
@@ -449,7 +479,6 @@ class RMSD(object):
                 best_match = np.argmin(rmsds)
 
                 self._permutations[frozenset((i, j))] = permutations[best_match]
-                # self._symmetries[(i, j)] = symmetries
 
                 self._rmsd[i, j] = rmsds[best_match]
 
@@ -502,7 +531,7 @@ class RMSD(object):
 
         return widest_matches, best_rmsd
 
-    def calc_strain(self, structures, match='best', rmsd_max=np.inf):
+    def calc_strain(self, structures, match='best', rmsd_max=np.inf, return_affine=False):
 
         if match == 'best':
             matches, rmsd = self.best_matches(structures)
@@ -511,11 +540,15 @@ class RMSD(object):
         else:
             raise ValueError()
 
-        strain = np.empty((len(structures), 2, 2))
-        strain[:] = np.nan
+        if return_affine:
+            affine = np.empty((len(structures), 3, 3))
+            affine[:] = np.nan
+        else:
+            strain = np.empty((len(structures), 2, 2))
+            strain[:] = np.nan
 
-        rotation = np.empty(len(structures))
-        rotation[:] = np.nan
+            rotation = np.empty(len(structures))
+            rotation[:] = np.nan
 
         axis = self._get_axis(structures)
         other = self._get_other(structures)
@@ -536,12 +569,18 @@ class RMSD(object):
 
                     A = _affine_transform(p, q)
 
-                    U, P = scipy.linalg.polar(A[:-1, :-1], side='left')
+                    if return_affine:
+                        affine[i] = A
+                    else:
+                        U, P = scipy.linalg.polar(A[:-1, :-1], side='left')
 
-                    rotation[i] = np.arctan2(U[0, 1], U[0, 0])  # % (2 * np.pi / self._symmetries[key])
+                        rotation[i] = np.arctan2(U[0, 1], U[0, 0])
 
-                    strain[i] = P - np.identity(2)
+                        strain[i] = P - np.identity(2)
                 except:
                     pass
 
-        return strain, rotation
+        if return_affine:
+            return affine
+        else:
+            return strain, rotation

@@ -1,5 +1,14 @@
 import numpy as np
 from IPython.display import clear_output
+import numba
+
+
+@numba.njit
+def set_difference(ar1, ar2):
+    mask = np.full(len(ar1), True)
+    for a in ar2:
+        mask &= (ar1 != a)
+    return ar1[mask]
 
 
 def flatten(lists):
@@ -55,6 +64,7 @@ class ProgressBar(object):
             progress_bar = ('|' * (p // self._update_every)).ljust(self._intervals)
             print('{} [{}] {}/{} {}'.format(self._description, progress_bar, i + 1, self._num_iter, self._units))
             clear_output(wait=True)
+
 
 def bar(itrble, num_iter=None, **kwargs):
     """Simple progress bar. tqdm slows down tight loops!"""

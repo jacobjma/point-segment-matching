@@ -23,8 +23,6 @@ def rmsd_kabsch(src, dst):
 
 def rmsd_qcp_slow(src, dst):
     """ The minimized RMSD between two sets of points with the QCP algorithm.
-
-    A faster C version is also provided.
     """
 
     M = np.dot(dst.T, src)

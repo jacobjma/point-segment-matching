@@ -2,6 +2,60 @@ import numpy as np
 from scipy.sparse.csgraph import connected_components
 
 from psm.utils import labels2groups
+import numba
+
+
+def adjacency_array_to_list_of_sets(array, num_adjacent):
+    return [set(adjacent[:l]) for adjacent, l in zip(array, num_adjacent)]
+
+
+def adjacency_list_of_sets_to_array(list_of_sets):
+    num_adjacent = np.array([len(adjacent) for adjacent in list_of_sets])
+    adjacency = np.full((len(list_of_sets), max(num_adjacent)), -1, dtype=np.int32)
+    for i, adjacent in enumerate(list_of_sets):
+        adjacency[i, :num_adjacent[i]] = list(adjacent)
+    return adjacency, num_adjacent
+
+
+
+
+@numba.njit
+def adjacency_to_edges(adjacency, lengths):
+    n = len(adjacency)
+    edges = np.zeros((n * adjacency.shape[1], 2), dtype=np.int32)
+    k = 0
+    for i in range(n):
+        for j in adjacency[i][:lengths[i]]:
+            if i > j:
+                edges[k, 0] = i
+                edges[k, 1] = j
+                k += 1
+    return edges[:k]
+
+
+@numba.njit
+def edges_to_adjacency(edges, num_nodes, max_adjacent=10):
+    adjacency = np.full((num_nodes, max_adjacent), -1)
+    insertion = np.zeros(num_nodes, dtype=np.int32)
+    for i in range(len(edges)):
+        n0 = edges[i][0]
+        n1 = edges[i][1]
+        adjacency[n0, insertion[n0]] = n1
+        insertion[n0] += 1
+        adjacency[n1, insertion[n1]] = n0
+        insertion[n1] += 1
+    return adjacency[:, :np.max(insertion)], insertion
+
+
+@numba.njit
+def adjacency_to_matrix(adjacency, lengths):
+    n = len(adjacency)
+    matrix = np.full((n, n), True)
+    for i in range(n):
+        for j in adjacency[i][:lengths[i]]:
+            matrix[i, j] = True
+            matrix[j, i] = True
+    return matrix
 
 
 def adjacency2edges(adjacency):
